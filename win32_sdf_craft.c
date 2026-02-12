@@ -1216,7 +1216,7 @@ SDF_CRAFT_API f32 sdSphere(vec3 pos, f32 radius)
 
 SDF_CRAFT_API f32 sdf_craft_map(win32_sdf_craft_state *state, vec3 pos)
 {
-  vec3 sphere_pos = vec3_init(sdf_math_sinf((f32)state->iTime) * 0.3f, 0.0f, 0.0f);
+  vec3 sphere_pos = vec3_init(sdf_math_sinf((f32)state->iTime) * 0.3f, sdf_math_cosf((f32)state->iTime) * 0.1f, 0.0f);
   f32 sphere = sdSphere(vec3_sub(pos, sphere_pos), 0.25f);
   f32 ground = pos.y - (-0.25f);
 
