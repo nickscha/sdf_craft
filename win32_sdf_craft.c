@@ -981,6 +981,7 @@ SDF_CRAFT_API void framebuffer_debug(win32_sdf_craft_state *state)
 }
 
 #define SDF_MATH_PI2 6.28318530717958647692f
+#define SDF_MATH_PI_HALF 1.57079632679489661923f
 #define SDF_MATH_LUT_SIZE 256
 
 static f32 sdf_math_lut[SDF_MATH_LUT_SIZE] = {
@@ -1039,6 +1040,68 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_sinf(f32 x)
   return (sdf_math_lut[i] + frac * (sdf_math_lut[i2] - sdf_math_lut[i]));
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_cosf(f32 x)
+{
+  return (sdf_math_sinf(x + SDF_MATH_PI_HALF));
+}
+
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4699) /* MSVC-specific aliasing warning */
+#endif
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_invsqrt(f32 number)
+{
+  union
+  {
+    f32 f;
+    i32 i;
+  } conv;
+
+  f32 x2, y;
+  const f32 threehalfs = 1.5F;
+
+  x2 = number * 0.5F;
+  conv.f = number;
+  conv.i = 0x5f3759df - (conv.i >> 1); /* Magic number for approximation */
+  y = conv.f;
+  y = y * (threehalfs - (x2 * y * y)); /* One iteration of Newton's method */
+
+  return (y);
+}
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_sqrtf(f32 x)
+{
+  return (x * vm_invsqrt(x));
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 mixf(f32 a, f32 b, f32 t)
+{
+  return a + (b - a) * t;
+}
+
+/* Schraudolph-style */
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 fast_exp(f32 x)
+{
+  union
+  {
+    u32 i;
+    f32 f;
+  } v;
+
+  v.i = (u32)(12102203.0f * x + 1064866805.0f);
+
+  return v.f;
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
 {
   if (v <= 0.0f)
@@ -1052,12 +1115,271 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
   return (u8)(v * 255.0f + 0.5f);
 }
 
+typedef struct vec2
+{
+  f32 x;
+  f32 y;
+} vec2;
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_init(f32 x, f32 y)
+{
+  vec2 result;
+
+  result.x = x;
+  result.y = y;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_sub(vec2 a, vec2 b)
+{
+  vec2 result;
+
+  result.x = a.x - b.x;
+  result.y = a.y - b.y;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_div(vec2 a, vec2 b)
+{
+  vec2 result;
+
+  result.x = a.x / b.x;
+  result.y = a.y / b.y;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_divf(vec2 a, f32 value)
+{
+  vec2 result;
+
+  result.x = a.x / value;
+  result.y = a.y / value;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_mulf(vec2 a, f32 value)
+{
+  vec2 result = a;
+
+  result.x *= value;
+  result.y *= value;
+
+  return result;
+}
+
 typedef struct vec3
 {
-  float x;
-  float y;
-  float z;
+  f32 x;
+  f32 y;
+  f32 z;
 } vec3;
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_init(f32 x, f32 y, f32 z)
+{
+  vec3 result;
+
+  result.x = x;
+  result.y = y;
+  result.z = z;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_add(vec3 a, vec3 b)
+{
+  vec3 result = a;
+
+  result.x += b.x;
+  result.y += b.y;
+  result.z += b.z;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_sub(vec3 a, vec3 b)
+{
+  vec3 result = a;
+
+  result.x -= b.x;
+  result.y -= b.y;
+  result.z -= b.z;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_subf(vec3 a, f32 value)
+{
+  vec3 result = a;
+
+  result.x -= value;
+  result.y -= value;
+  result.z -= value;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mul(vec3 a, vec3 b)
+{
+  vec3 result = a;
+
+  result.x *= b.x;
+  result.y *= b.y;
+  result.z *= b.z;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mulf(vec3 a, f32 value)
+{
+  vec3 result = a;
+
+  result.x *= value;
+  result.y *= value;
+  result.z *= value;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vm_v3_cross(vec3 a, vec3 b)
+{
+  vec3 result;
+
+  result.x = (a.y * b.z) - (a.z * b.y);
+  result.y = (a.z * b.x) - (a.x * b.z);
+  result.z = (a.x * b.y) - (a.y * b.x);
+
+  return (result);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mix(vec3 a, vec3 b, f32 t)
+{
+  vec3 r;
+  r.x = mixf(a.x, b.x, t);
+  r.y = mixf(a.y, b.y, t);
+  r.z = mixf(a.z, b.z, t);
+  return r;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vec3_length(vec3 a)
+{
+  return (vm_sqrtf(a.x * a.x + a.y * a.y + a.z * a.z));
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
+{
+  f32 length_squared = (a.x * a.x) + (a.y * a.y) + (a.z * a.z);
+  f32 scalar = (length_squared > 0.0f) ? vm_invsqrt(length_squared) : 0.0f;
+
+  vec3 result;
+
+  result.x = a.x * scalar;
+  result.y = a.y * scalar;
+  result.z = a.z * scalar;
+
+  return (result);
+}
+
+SDF_CRAFT_API f32 sdSphere(vec3 pos, f32 radius)
+{
+  return vec3_length(pos) - radius;
+}
+
+SDF_CRAFT_API f32 sdf_craft_map(win32_sdf_craft_state *state, vec3 pos)
+{
+  vec3 sphere_pos = vec3_init(sdf_math_sinf((f32)state->iTime) * 0.3f, 0.0f, 0.0f);
+  f32 sphere = sdSphere(vec3_sub(pos, sphere_pos), 0.25f);
+
+  return sphere;
+}
+
+SDF_CRAFT_API vec3 calc_normal(win32_sdf_craft_state *state, vec3 pos)
+{
+  vec2 e = vec2_init(0.0001f, 0.0f);
+  vec3 e_xyy = vec3_init(e.x, e.y, e.y);
+  vec3 e_yxy = vec3_init(e.y, e.x, e.y);
+  vec3 e_yyx = vec3_init(e.y, e.y, e.x);
+
+  return vec3_normalize(vec3_init(
+      sdf_craft_map(state, vec3_add(pos, e_xyy)) - sdf_craft_map(state, vec3_sub(pos, e_xyy)),
+      sdf_craft_map(state, vec3_add(pos, e_yxy)) - sdf_craft_map(state, vec3_sub(pos, e_yxy)),
+      sdf_craft_map(state, vec3_add(pos, e_yyx)) - sdf_craft_map(state, vec3_sub(pos, e_yyx))));
+}
+
+SDF_CRAFT_API f32 sdf_craft_cast_ray(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
+{
+  f32 t = 0.0;
+  u32 i;
+
+  for (i = 0; i < 100; ++i)
+  {
+    vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
+
+    f32 h = sdf_craft_map(state, pos);
+
+    if (h < 0.001f)
+    {
+      break;
+    }
+
+    t += h;
+
+    if (t > 20.0f)
+    {
+      break;
+    }
+  }
+
+  if (t > 20.0f)
+  {
+    t = -1.0f;
+  }
+
+  return t;
+}
+
+SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_coord)
+{
+  f32 t;
+
+  vec2 iResolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
+
+  vec2 p = vec2_divf(vec2_sub(vec2_mulf(frag_coord, 2.0f), iResolution), iResolution.y);
+  f32 an = 0.1f * (f32)state->iTime;
+
+  /*
+  vec3 ro = vec3_init(1.0f * sdf_math_sinf(an), 0.0f, 1.0f * sdf_math_cosf(an));
+  */
+
+  vec3 ro = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin */
+  vec3 ta = vec3_init(0.0f, 0.0f, 0.0f);
+
+  vec3 ww = vec3_normalize(vec3_sub(ta, ro));
+  vec3 uu = vec3_normalize(vm_v3_cross(ww, vec3_init(0.0f, 1.0f, 0.0f)));
+  vec3 vv = vec3_normalize(vm_v3_cross(uu, ww));
+
+  vec3 rd = vec3_normalize(vec3_add(vec3_add(vec3_mulf(uu, p.x), vec3_mulf(vv, p.y)), vec3_mulf(ww, 1.5f))); /* ray direction */
+
+  vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * rd.y);            /* sky, darker the higher */
+  col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), fast_exp(-10.0f * rd.y)); /* above ground light horizon */
+
+  t = sdf_craft_cast_ray(state, ro, rd);
+
+  (void)an;
+
+  if (t > 0.0f)
+  {
+    vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
+    vec3 nor = calc_normal(state, pos);
+
+    col = nor;
+  }
+
+  return col;
+}
 
 /* GLSL mainImage pixel processing
  *
@@ -1068,18 +1390,12 @@ typedef struct vec3
  *   outColor = vec4(uv, 0.5 + 0.5 * sin(t), 1.0);
  * }
  */
-SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
+vec3 sdf_craft_main_image_gradient(win32_sdf_craft_state *state, vec2 frag_coord)
 {
-  vec3 out_color = {0};
+  vec2 resolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
+  vec2 uv = vec2_div(frag_coord, resolution);
 
-  f32 uv_x = frag_coord_x / (f32)state->framebuffer_width;
-  f32 uv_y = frag_coord_y / (f32)state->framebuffer_height;
-
-  out_color.x = uv_x;
-  out_color.y = uv_y;
-  out_color.z = 0.5f + 0.5f * sdf_math_sinf((f32)state->iTime);
-
-  return out_color;
+  return vec3_init(uv.x, uv.y, 0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
 }
 
 /* GLSL main fragment shader entry point
@@ -1099,7 +1415,8 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
   {
     for (x = 0; x < state->framebuffer_width; ++x)
     {
-      vec3 color = sdf_craft_main_image(state, (f32)x + 0.5f, (f32)y + 0.5f);
+      vec2 frag_coord = vec2_init((f32)x + 0.5f, (f32)y + 0.5f);
+      vec3 color = sdf_craft_main_image(state, frag_coord);
 
       *pixel++ = (float_to_u8(color.x) << 16) | (float_to_u8(color.y) << 8) | float_to_u8(color.z);
     }
