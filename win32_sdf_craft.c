@@ -615,8 +615,8 @@ typedef struct win32_sdf_craft_state
   u8 mouse_right_was_down;
 
   /* State Examples:
-    Key Pressed:  state.keys_is_down[0x0D] && !state.keys_was_down[0x0D]
-    Key Released: !state.keys_is_down[0x0D] && state.keys_was_down[0x0D]
+    Key Pressed:  state.keys_is_down[0x70] && !state.keys_was_down[0x70]
+    Key Released: !state.keys_is_down[0x70] && state.keys_was_down[0x70]
 
     Example of a Toggle switch (when pressed first toggles on, when pressed second time toggles off):
 
@@ -629,6 +629,8 @@ typedef struct win32_sdf_craft_state
   */
   u8 keys_is_down[KEYS_COUNT];
   u8 keys_was_down[KEYS_COUNT];
+
+  u8 visualize_normals_enabled;
 
   void *framebuffer;
   u32 framebuffer_width;
@@ -1021,7 +1023,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 stepf(f32 edge, f32 x)
   return (x < edge) ? 0.0f : 1.0f;
 }
 
-f32 smin(f32 a, f32 b, f32 k)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 sminf(f32 a, f32 b, f32 k)
 {
   f32 h = maxf(k - absf(a - b), 0.0f) / k;
   return minf(a, b) - h * h * h * k * (1.0f / 6.0f);
@@ -1219,7 +1221,7 @@ SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
   f32 sphere = sdf_sphere(vec3_sub(pos, sphere_pos), 0.25f);
   f32 ground = pos.y - (-0.25f);
 
-  return smin(ground, sphere, 0.2f);
+  return sminf(ground, sphere, 0.1f);
 }
 
 SDF_CRAFT_API vec3 sdf_calc_normal(win32_sdf_craft_state *state, vec3 pos)
@@ -1299,18 +1301,23 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
     vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
     vec3 nor = sdf_calc_normal(state, pos);
 
-    vec3 mate = vec3_init(0.18f, 0.18f, 0.18f);
-    vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
-    f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
-    f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
-    f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, 1.0f, 0.0f)), 0.0f, 1.0f);
-    f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, -1.0f, 0.0f)), 0.0f, 1.0f);
+    if (state->visualize_normals_enabled)
+    {
+      col = nor;
+    }
+    else
+    {
+      vec3 mate = vec3_init(0.18f, 0.18f, 0.18f);
+      vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
+      f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
+      f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
+      f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, 1.0f, 0.0f)), 0.0f, 1.0f);
+      f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, -1.0f, 0.0f)), 0.0f, 1.0f);
 
-    col = vec3_mulf(vec3_mul(mate, vec3_init(7.0f, 4.5f, 3.0f)), sun_dif * sun_sha);
-    col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.5f, 0.8f, 0.9f)), sky_dif));
-    col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.7f, 0.3f, 0.2f)), bou_dif)); /* bounce light */
-
-    /* col = nor; */
+      col = vec3_mulf(vec3_mul(mate, vec3_init(7.0f, 4.5f, 3.0f)), sun_dif * sun_sha);
+      col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.5f, 0.8f, 0.9f)), sky_dif));
+      col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.7f, 0.3f, 0.2f)), bou_dif)); /* bounce light */
+    }
   }
 
   return col;
@@ -1379,7 +1386,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
 {
   win32_sdf_craft_state state = {0};
   state.running = 1;
-  state.window_title = "sdf_craft v0.1";
+  state.window_title = "sdf_craft v0.1 (F1=Normals)";
   state.framebuffer_width = 300;
   state.framebuffer_height = 225;
   state.window_width = state.framebuffer_width * 2;
@@ -1526,6 +1533,11 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /******************************/
       /* Main Logic                 */
       /******************************/
+      if (state.keys_is_down[0x70] && !state.keys_was_down[0x70]) /* F1 */
+      {
+        state.visualize_normals_enabled = !state.visualize_normals_enabled;
+      }
+
       sdf_craft_main(&state);
 
       StretchDIBits(
