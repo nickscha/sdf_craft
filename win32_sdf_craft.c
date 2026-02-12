@@ -465,49 +465,6 @@ WIN32_API(i32)    Thread32Next(void* hSnapshot, THREADENTRY32* lpte);
 /* clang-format on */
 
 /* #############################################################################
- * # [SECTION] XINPUT gamepad controller support
- * #############################################################################
- */
-#define XINPUT_USER_MAX_COUNT 4
-#define XINPUT_GAMEPAD_DPAD_UP 0x0001
-#define XINPUT_GAMEPAD_DPAD_DOWN 0x0002
-#define XINPUT_GAMEPAD_DPAD_LEFT 0x0004
-#define XINPUT_GAMEPAD_DPAD_RIGHT 0x0008
-#define XINPUT_GAMEPAD_START 0x0010
-#define XINPUT_GAMEPAD_BACK 0x0020
-#define XINPUT_GAMEPAD_LEFT_THUMB 0x0040
-#define XINPUT_GAMEPAD_RIGHT_THUMB 0x0080
-#define XINPUT_GAMEPAD_LEFT_SHOULDER 0x0100
-#define XINPUT_GAMEPAD_RIGHT_SHOULDER 0x0200
-#define XINPUT_GAMEPAD_A 0x1000
-#define XINPUT_GAMEPAD_B 0x2000
-#define XINPUT_GAMEPAD_X 0x4000
-#define XINPUT_GAMEPAD_Y 0x8000
-#define XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE 7849
-#define XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE 8689
-#define XINPUT_GAMEPAD_TRIGGER_THRESHOLD 30
-
-typedef struct XINPUT_GAMEPAD
-{
-  u16 wButtons;
-  u8 bLeftTrigger;
-  u8 bRightTrigger;
-  i16 sThumbLX;
-  i16 sThumbLY;
-  i16 sThumbRX;
-  i16 sThumbRY;
-} XINPUT_GAMEPAD;
-
-typedef struct XINPUT_STATE
-{
-  u32 dwPacketNumber;
-  XINPUT_GAMEPAD Gamepad;
-} XINPUT_STATE;
-
-typedef u32(__stdcall *XInputGetStateFunc)(u32 dwUserIndex, XINPUT_STATE *pState);
-static XInputGetStateFunc XInputGetState = 0;
-
-/* #############################################################################
  * # [SECTION] WIN32 specifiy functions
  * #############################################################################
  */
@@ -630,92 +587,6 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 win32_enable_high_resolution_timer(void)
   return 1;
 }
 
-#define KEYS_COUNT 256
-
-typedef struct win32_controller_state
-{
-
-  u8 button_a;
-  u8 button_b;
-  u8 button_x;
-  u8 button_y;
-
-  u8 shoulder_left;
-  u8 shoulder_right;
-
-  u8 trigger_left;
-  u8 trigger_right;
-
-  u8 dpad_up;
-  u8 dpad_down;
-  u8 dpad_left;
-  u8 dpad_right;
-
-  u8 stick_left;
-  u8 stick_right;
-
-  u8 start;
-  u8 back;
-
-  f32 stick_left_x;
-  f32 stick_left_y;
-  f32 stick_right_x;
-  f32 stick_right_y;
-
-  f32 trigger_left_value;
-  f32 trigger_right_value;
-
-  u8 id; /* The XInput id associated with this controller */
-  u8 connected;
-  u8 check_needed; /* If a device is plugged in or disconnected we should check XInput controller state again */
-
-} win32_controller_state;
-
-SDF_CRAFT_API u8 xinput_load(void)
-{
-  void *xinput_lib = LoadLibraryA("xinput1_4.dll");
-
-  if (!xinput_lib)
-  {
-    xinput_lib = LoadLibraryA("xinput1_3.dll");
-  }
-
-  if (!xinput_lib)
-  {
-    xinput_lib = LoadLibraryA("xinput9_1_0.dll");
-  }
-
-  if (!xinput_lib)
-  {
-    return 0;
-  }
-
-  *(void **)(&XInputGetState) = GetProcAddress(xinput_lib, "XInputGetState");
-
-  return 1;
-}
-
-SDF_CRAFT_API f32 xinput_process_thumbstick(i16 value, i16 deadzone)
-{
-  f32 result = 0.0f;
-
-  if (value > deadzone)
-  {
-    result = (f32)(value - deadzone) / (32767.0f - deadzone);
-  }
-  else if (value < -deadzone)
-  {
-    result = (f32)(value + deadzone) / (32768.0f - deadzone);
-  }
-
-  return result;
-}
-
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 xinput_process_trigger(u8 value)
-{
-  return value > XINPUT_GAMEPAD_TRIGGER_THRESHOLD ? (f32)value / 255.0f : 0.0f;
-}
-
 typedef struct process_memory_info
 {
   u64 private_bytes; /* Commit charge (what you asked for) */
@@ -774,6 +645,8 @@ u8 win32_process_memory(process_memory_info *out)
   return 1;
 }
 
+#define KEYS_COUNT 256
+
 typedef struct win32_sdf_craft_state
 {
 
@@ -831,8 +704,6 @@ typedef struct win32_sdf_craft_state
   */
   u8 keys_is_down[KEYS_COUNT];
   u8 keys_was_down[KEYS_COUNT];
-
-  win32_controller_state controller;
 
   void *framebuffer;
   u32 framebuffer_width;
@@ -968,7 +839,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE i64 win32_window_callback(void *window, u32 messa
     /* DBT_DEVNODES_CHANGED is the most reliable for USB plugging/unplugging */
     if (wParam == DBT_DEVNODES_CHANGED || wParam == DBT_DEVICEARRIVAL || wParam == DBT_DEVICEREMOVECOMPLETE)
     {
-      state->controller.check_needed = 1;
+      /* TODO(nickscha): XInput handling */
     }
   }
   break;
@@ -1099,7 +970,6 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
   state.window_clear_color_g = 0.2f;
   state.window_clear_color_b = 0.2f;
   state.target_frames_per_second = 60; /* 60 FPS, 0 = unlimited */
-  state.controller.check_needed = 1;   /* By default we have to query first XInput state */
 
   (void)argc;
   (void)argv;
@@ -1126,14 +996,6 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
   if (!win32_enable_high_resolution_timer())
   {
     win32_print("[WARNING] Cannot set win32 high resolution timer using Winmm.dll (timeBeginPeriod)\n");
-  }
-
-  /******************************/
-  /* Load XInput Controller     */
-  /******************************/
-  if (!xinput_load())
-  {
-    win32_print("[WARNING] Could not load XInput (xinput1_4.dll, xinput1_3.dll or xinput9_1_0.dll)! XInput gamepads/controllers (e.g. XBOX) are not functional.\n");
   }
 
   /******************************/
@@ -1229,77 +1091,6 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
 
         state.mouse_x = p.x;
         state.mouse_y = (i32)state.window_height - 1 - p.y;
-      }
-
-      /******************************/
-      /* XInput Controller          */
-      /******************************/
-      if (XInputGetState)
-      {
-
-        /* If we recieve a WM_DEVICECHANGE message (hardware connected or disconnected to machine)
-         * we need to check again the XInput Controller state.
-         */
-        if (state.controller.check_needed)
-        {
-          u8 i = 0;
-
-          XINPUT_STATE xinput_state = {0};
-
-          state.controller.connected = 0;
-
-          for (i = 0; i < XINPUT_USER_MAX_COUNT; ++i)
-          {
-            u32 result = XInputGetState(i, &xinput_state);
-
-            if (result == 0)
-            {
-              state.controller.id = i;
-              state.controller.connected = 1;
-              break;
-            }
-          }
-
-          state.controller.check_needed = 0;
-        }
-
-        if (state.controller.connected)
-        {
-          XINPUT_STATE xinput_state = {0};
-          u32 result = XInputGetState(state.controller.id, &xinput_state);
-
-          if (result == 0)
-          {
-            XINPUT_GAMEPAD *gp = &xinput_state.Gamepad;
-            state.controller.button_a = (gp->wButtons & XINPUT_GAMEPAD_A) ? 1 : 0;
-            state.controller.button_b = (gp->wButtons & XINPUT_GAMEPAD_B) ? 1 : 0;
-            state.controller.button_x = (gp->wButtons & XINPUT_GAMEPAD_X) ? 1 : 0;
-            state.controller.button_y = (gp->wButtons & XINPUT_GAMEPAD_Y) ? 1 : 0;
-            state.controller.shoulder_left = (gp->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) ? 1 : 0;
-            state.controller.shoulder_right = (gp->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) ? 1 : 0;
-            state.controller.dpad_up = (gp->wButtons & XINPUT_GAMEPAD_DPAD_UP) ? 1 : 0;
-            state.controller.dpad_down = (gp->wButtons & XINPUT_GAMEPAD_DPAD_DOWN) ? 1 : 0;
-            state.controller.dpad_left = (gp->wButtons & XINPUT_GAMEPAD_DPAD_LEFT) ? 1 : 0;
-            state.controller.dpad_right = (gp->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) ? 1 : 0;
-            state.controller.start = (gp->wButtons & XINPUT_GAMEPAD_START) ? 1 : 0;
-            state.controller.back = (gp->wButtons & XINPUT_GAMEPAD_BACK) ? 1 : 0;
-            state.controller.stick_left = (gp->wButtons & XINPUT_GAMEPAD_LEFT_THUMB) ? 1 : 0;
-            state.controller.stick_right = (gp->wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) ? 1 : 0;
-            state.controller.trigger_left_value = xinput_process_trigger(gp->bLeftTrigger);
-            state.controller.trigger_right_value = xinput_process_trigger(gp->bRightTrigger);
-            state.controller.trigger_left = state.controller.trigger_left_value > 0.0f ? 1 : 0;
-            state.controller.trigger_right = state.controller.trigger_right_value > 0.0f ? 1 : 0;
-            state.controller.stick_left_x = xinput_process_thumbstick(gp->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-            state.controller.stick_left_y = xinput_process_thumbstick(gp->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-            state.controller.stick_right_x = xinput_process_thumbstick(gp->sThumbRX, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
-            state.controller.stick_right_y = xinput_process_thumbstick(gp->sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
-          }
-          else
-          {
-            state.controller.check_needed = 1;
-            state.controller.connected = 0;
-          }
-        }
       }
 
       /******************************/
