@@ -862,11 +862,15 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
   s->framebuffer_info.bmiHeader.biBitCount = 32;
 }
 
-#define SDF_MATH_PI2 6.28318530717958647692f
-#define SDF_MATH_PI_HALF 1.57079632679489661923f
-#define SDF_MATH_LUT_SIZE 256
+/* #############################################################################
+ * # [SECTION] Base Math
+ * #############################################################################
+ */
+#define PI2 6.28318530717958647692f
+#define PI_HALF 1.57079632679489661923f
+#define SIN_LUT_SIZE 256
 
-static f32 sdf_math_lut[SDF_MATH_LUT_SIZE] = {
+static f32 sin_lut[SIN_LUT_SIZE] = {
     0.0000f, 0.0245f, 0.0491f, 0.0736f, 0.0980f, 0.1224f, 0.1467f, 0.1710f,
     0.1951f, 0.2191f, 0.2430f, 0.2667f, 0.2903f, 0.3137f, 0.3369f, 0.3599f,
     0.3827f, 0.4052f, 0.4276f, 0.4496f, 0.4714f, 0.4929f, 0.5141f, 0.5350f,
@@ -900,31 +904,31 @@ static f32 sdf_math_lut[SDF_MATH_LUT_SIZE] = {
     -0.3827f, -0.3599f, -0.3369f, -0.3137f, -0.2903f, -0.2667f, -0.2430f, -0.2191f,
     -0.1951f, -0.1710f, -0.1467f, -0.1224f, -0.0980f, -0.0736f, -0.0491f, -0.0245f};
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_sinf(f32 x)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 sinf(f32 x)
 {
   f32 index, frac;
   i32 i, i2;
 
-  x -= SDF_MATH_PI2 * (f32)((i32)(x * (1.0f / SDF_MATH_PI2)));
+  x -= PI2 * (f32)((i32)(x * (1.0f / PI2)));
 
   if (x < 0)
   {
-    x += SDF_MATH_PI2;
+    x += PI2;
   }
 
-  index = x * (SDF_MATH_LUT_SIZE / SDF_MATH_PI2);
+  index = x * (SIN_LUT_SIZE / PI2);
   i = (i32)index;
   frac = index - (f32)i;
 
-  i &= (SDF_MATH_LUT_SIZE - 1);
-  i2 = (i + 1) & (SDF_MATH_LUT_SIZE - 1);
+  i &= (SIN_LUT_SIZE - 1);
+  i2 = (i + 1) & (SIN_LUT_SIZE - 1);
 
-  return (sdf_math_lut[i] + frac * (sdf_math_lut[i2] - sdf_math_lut[i]));
+  return (sin_lut[i] + frac * (sin_lut[i2] - sin_lut[i]));
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_cosf(f32 x)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 cosf(f32 x)
 {
-  return (sdf_math_sinf(x + SDF_MATH_PI_HALF));
+  return (sinf(x + PI_HALF));
 }
 
 #ifdef __GNUC__
@@ -935,7 +939,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_cosf(f32 x)
 #pragma warning(push)
 #pragma warning(disable : 4699) /* MSVC-specific aliasing warning */
 #endif
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_invsqrt(f32 number)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 invsqrtf(f32 number)
 {
   union
   {
@@ -960,9 +964,9 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_invsqrt(f32 number)
 #pragma warning(pop)
 #endif
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_sqrtf(f32 x)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 sqrtf(f32 x)
 {
-  return (x * vm_invsqrt(x));
+  return (x * invsqrtf(x));
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 mixf(f32 a, f32 b, f32 t)
@@ -971,7 +975,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 mixf(f32 a, f32 b, f32 t)
 }
 
 /* Schraudolph-style */
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 fast_exp(f32 x)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 expf(f32 x)
 {
   union
   {
@@ -1002,12 +1006,12 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 absf(f32 x)
   return (x < 0.0f ? -x : x);
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_minf(f32 a, f32 b)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 minf(f32 a, f32 b)
 {
   return ((a < b) ? a : b);
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_maxf(f32 a, f32 b)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 maxf(f32 a, f32 b)
 {
   return ((a > b) ? a : b);
 }
@@ -1019,28 +1023,26 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 stepf(f32 edge, f32 x)
 
 f32 smin(f32 a, f32 b, f32 k)
 {
-  f32 h = vm_maxf(k - absf(a - b), 0.0f) / k;
-  return vm_minf(a, b) - h * h * h * k * (1.0f / 6.0f);
+  f32 h = maxf(k - absf(a - b), 0.0f) / k;
+  return minf(a, b) - h * h * h * k * (1.0f / 6.0f);
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
-{
-  if (v <= 0.0f)
-  {
-    return 0;
-  }
-  if (v >= 1.0f)
-  {
-    return 255;
-  }
-  return (u8)(v * 255.0f + 0.5f);
-}
-
+/* #############################################################################
+ * # [SECTION] Vector/Linear Algebra Math
+ * #############################################################################
+ */
 typedef struct vec2
 {
   f32 x;
   f32 y;
 } vec2;
+
+typedef struct vec3
+{
+  f32 x;
+  f32 y;
+  f32 z;
+} vec3;
 
 SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_init(f32 x, f32 y)
 {
@@ -1091,13 +1093,6 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec2 vec2_mulf(vec2 a, f32 value)
 
   return result;
 }
-
-typedef struct vec3
-{
-  f32 x;
-  f32 y;
-  f32 z;
-} vec3;
 
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_init(f32 x, f32 y, f32 z)
 {
@@ -1192,13 +1187,13 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mix(vec3 a, vec3 b, f32 t)
 
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 vec3_length(vec3 a)
 {
-  return (vm_sqrtf(a.x * a.x + a.y * a.y + a.z * a.z));
+  return (sqrtf(a.x * a.x + a.y * a.y + a.z * a.z));
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
 {
   f32 length_squared = (a.x * a.x) + (a.y * a.y) + (a.z * a.z);
-  f32 scalar = (length_squared > 0.0f) ? vm_invsqrt(length_squared) : 0.0f;
+  f32 scalar = (length_squared > 0.0f) ? invsqrtf(length_squared) : 0.0f;
 
   vec3 result;
 
@@ -1209,21 +1204,25 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
   return (result);
 }
 
-SDF_CRAFT_API f32 sdSphere(vec3 pos, f32 radius)
+/* #############################################################################
+ * # [SECTION] SDF Raymarching
+ * #############################################################################
+ */
+SDF_CRAFT_API f32 sdf_sphere(vec3 pos, f32 radius)
 {
   return vec3_length(pos) - radius;
 }
 
-SDF_CRAFT_API f32 sdf_craft_map(win32_sdf_craft_state *state, vec3 pos)
+SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
 {
-  vec3 sphere_pos = vec3_init(sdf_math_sinf((f32)state->iTime) * 0.3f, sdf_math_cosf((f32)state->iTime) * 0.1f, 0.0f);
-  f32 sphere = sdSphere(vec3_sub(pos, sphere_pos), 0.25f);
+  vec3 sphere_pos = vec3_init(sinf((f32)state->iTime) * 0.3f, cosf((f32)state->iTime) * 0.1f, 0.0f);
+  f32 sphere = sdf_sphere(vec3_sub(pos, sphere_pos), 0.25f);
   f32 ground = pos.y - (-0.25f);
 
   return smin(ground, sphere, 0.2f);
 }
 
-SDF_CRAFT_API vec3 calc_normal(win32_sdf_craft_state *state, vec3 pos)
+SDF_CRAFT_API vec3 sdf_calc_normal(win32_sdf_craft_state *state, vec3 pos)
 {
   vec2 e = vec2_init(0.0001f, 0.0f);
   vec3 e_xyy = vec3_init(e.x, e.y, e.y);
@@ -1231,12 +1230,12 @@ SDF_CRAFT_API vec3 calc_normal(win32_sdf_craft_state *state, vec3 pos)
   vec3 e_yyx = vec3_init(e.y, e.y, e.x);
 
   return vec3_normalize(vec3_init(
-      sdf_craft_map(state, vec3_add(pos, e_xyy)) - sdf_craft_map(state, vec3_sub(pos, e_xyy)),
-      sdf_craft_map(state, vec3_add(pos, e_yxy)) - sdf_craft_map(state, vec3_sub(pos, e_yxy)),
-      sdf_craft_map(state, vec3_add(pos, e_yyx)) - sdf_craft_map(state, vec3_sub(pos, e_yyx))));
+      sdf_map(state, vec3_add(pos, e_xyy)) - sdf_map(state, vec3_sub(pos, e_xyy)),
+      sdf_map(state, vec3_add(pos, e_yxy)) - sdf_map(state, vec3_sub(pos, e_yxy)),
+      sdf_map(state, vec3_add(pos, e_yyx)) - sdf_map(state, vec3_sub(pos, e_yyx))));
 }
 
-SDF_CRAFT_API f32 sdf_craft_cast_ray(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
+SDF_CRAFT_API f32 sdf_ray_cast(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
 {
   f32 t = 0.0;
   u32 i;
@@ -1245,7 +1244,7 @@ SDF_CRAFT_API f32 sdf_craft_cast_ray(win32_sdf_craft_state *state, vec3 ro, vec3
   {
     vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
 
-    f32 h = sdf_craft_map(state, pos);
+    f32 h = sdf_map(state, pos);
 
     if (h < 0.001f)
     {
@@ -1268,7 +1267,7 @@ SDF_CRAFT_API f32 sdf_craft_cast_ray(win32_sdf_craft_state *state, vec3 ro, vec3
   return t;
 }
 
-SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_coord)
+SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
 {
   f32 t;
 
@@ -1278,7 +1277,7 @@ SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_
 
   /*
     f32 angle = 0.1f * (f32)state->iTime;
-    vec3 ro = vec3_init(1.0f * sdf_math_sinf(angle), 0.0f, 1.0f * sdf_math_cosf(angle));
+    vec3 ro = vec3_init(1.0f * sinf(angle), 0.0f, 1.0f * cosf(angle));
   */
 
   vec3 ro = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin */
@@ -1290,20 +1289,20 @@ SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_
 
   vec3 rd = vec3_normalize(vec3_add(vec3_add(vec3_mulf(uu, p.x), vec3_mulf(vv, p.y)), vec3_mulf(ww, 1.5f))); /* ray direction */
 
-  vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * rd.y);            /* sky, darker the higher */
-  col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), fast_exp(-10.0f * rd.y)); /* above ground light horizon */
+  vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * rd.y);        /* sky, darker the higher */
+  col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), expf(-10.0f * rd.y)); /* above ground light horizon */
 
-  t = sdf_craft_cast_ray(state, ro, rd);
+  t = sdf_ray_cast(state, ro, rd);
 
   if (t > 0.0f)
   {
     vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
-    vec3 nor = calc_normal(state, pos);
+    vec3 nor = sdf_calc_normal(state, pos);
 
     vec3 mate = vec3_init(0.18f, 0.18f, 0.18f);
     vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
     f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
-    f32 sun_sha = stepf(sdf_craft_cast_ray(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
+    f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
     f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, 1.0f, 0.0f)), 0.0f, 1.0f);
     f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, -1.0f, 0.0f)), 0.0f, 1.0f);
 
@@ -1326,12 +1325,25 @@ SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_
  *   outColor = vec4(uv, 0.5 + 0.5 * sin(t), 1.0);
  * }
  */
-vec3 sdf_craft_main_image_gradient(win32_sdf_craft_state *state, vec2 frag_coord)
+vec3 sdf_ray_march_gradient(win32_sdf_craft_state *state, vec2 frag_coord)
 {
   vec2 resolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
   vec2 uv = vec2_div(frag_coord, resolution);
 
-  return vec3_init(uv.x, uv.y, 0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
+  return vec3_init(uv.x, uv.y, 0.5f + 0.5f * sinf((f32)state->iTime));
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE u8 f32_to_u8(f32 v)
+{
+  if (v <= 0.0f)
+  {
+    return 0;
+  }
+  if (v >= 1.0f)
+  {
+    return 255;
+  }
+  return (u8)(v * 255.0f + 0.5f);
 }
 
 /* GLSL main fragment shader entry point
@@ -1352,9 +1364,9 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
     for (x = 0; x < state->framebuffer_width; ++x)
     {
       vec2 frag_coord = vec2_init((f32)x + 0.5f, (f32)y + 0.5f);
-      vec3 color = sdf_craft_main_image(state, frag_coord);
+      vec3 color = sdf_ray_march(state, frag_coord);
 
-      *pixel++ = (float_to_u8(color.x) << 16) | (float_to_u8(color.y) << 8) | float_to_u8(color.z);
+      *pixel++ = (f32_to_u8(color.x) << 16) | (f32_to_u8(color.y) << 8) | f32_to_u8(color.z);
     }
   }
 }
