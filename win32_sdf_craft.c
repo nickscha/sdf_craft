@@ -1052,10 +1052,12 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
   return (u8)(v * 255.0f + 0.5f);
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
+typedef struct vec3
 {
-  return (float_to_u8(r) << 16) | (float_to_u8(g) << 8) | float_to_u8(b);
-}
+  float x;
+  float y;
+  float z;
+} vec3;
 
 /* GLSL mainImage pixel processing
  *
@@ -1066,16 +1068,18 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
  *   outColor = vec4(uv, 0.5 + 0.5 * sin(t), 1.0);
  * }
  */
-SDF_CRAFT_API u32 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
+SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
 {
+  vec3 out_color = {0};
+
   f32 uv_x = frag_coord_x / (f32)state->framebuffer_width;
   f32 uv_y = frag_coord_y / (f32)state->framebuffer_height;
 
-  /* Gradient Color change based on iTime (elapsed seconds) */
-  return rgbf_to_u32(
-      uv_x,
-      uv_y,
-      0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
+  out_color.x = uv_x;
+  out_color.y = uv_y;
+  out_color.z = 0.5f + 0.5f * sdf_math_sinf((f32)state->iTime);
+
+  return out_color;
 }
 
 /* GLSL main fragment shader entry point
@@ -1095,7 +1099,9 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
   {
     for (x = 0; x < state->framebuffer_width; ++x)
     {
-      *pixel++ = sdf_craft_main_image(state, (f32)x + 0.5f, (f32)y + 0.5f);
+      vec3 color = sdf_craft_main_image(state, (f32)x + 0.5f, (f32)y + 0.5f);
+
+      *pixel++ = (float_to_u8(color.x) << 16) | (float_to_u8(color.y) << 8) | float_to_u8(color.z);
     }
   }
 }
