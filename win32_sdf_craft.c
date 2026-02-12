@@ -932,7 +932,7 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
   memset(&s->framebuffer_info, 0, sizeof(BITMAPINFO));
   s->framebuffer_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
   s->framebuffer_info.bmiHeader.biWidth = (i32)w;
-  s->framebuffer_info.bmiHeader.biHeight = -(i32)h; /* top-down */
+  s->framebuffer_info.bmiHeader.biHeight = (i32)h; /* h = down-top, -h = top-down */
   s->framebuffer_info.bmiHeader.biPlanes = 1;
   s->framebuffer_info.bmiHeader.biBitCount = 32;
 }
