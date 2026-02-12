@@ -937,20 +937,45 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
   s->framebuffer_info.bmiHeader.biBitCount = 32;
 }
 
-SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *s)
+SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *state)
 {
-  u32 *p = (u32 *)s->framebuffer;
+  u32 *p = (u32 *)state->framebuffer;
   u32 x, y;
 
-  u8 r = (u8)(255.0f * s->window_clear_color_r);
-  u8 g = (u8)(255.0f * s->window_clear_color_g);
-  u8 b = (u8)(255.0f * s->window_clear_color_b);
+  u8 r = (u8)(255.0f * state->window_clear_color_r);
+  u8 g = (u8)(255.0f * state->window_clear_color_g);
+  u8 b = (u8)(255.0f * state->window_clear_color_b);
 
-  for (y = 0; y < s->framebuffer_height; ++y)
+  for (y = 0; y < state->framebuffer_height; ++y)
   {
-    for (x = 0; x < s->framebuffer_width; ++x)
+    for (x = 0; x < state->framebuffer_width; ++x)
     {
       *p++ = (r << 16) | (g << 8) | b;
+    }
+  }
+}
+
+SDF_CRAFT_API void framebuffer_debug(win32_sdf_craft_state *state)
+{
+  u32 *p = (u32 *)state->framebuffer;
+  u32 x, y;
+
+  for (y = 0; y < state->framebuffer_height; ++y)
+  {
+    for (x = 0; x < state->framebuffer_width; ++x)
+    {
+      if (y < 8 && x < 8)
+      {
+        *p++ = (0 << 16) | (255 << 8) | 0;
+      }
+      else if (y > state->framebuffer_height - 8 && x > state->framebuffer_width - 8)
+      {
+        *p++ = (255 << 16) | (0 << 8) | 0;
+      }
+      else
+      {
+        p++;
+      }
     }
   }
 }
@@ -1108,6 +1133,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /* Main Logic                 */
       /******************************/
       framebuffer_clear(&state);
+      framebuffer_debug(&state);
 
       StretchDIBits(
           state.device_context,
