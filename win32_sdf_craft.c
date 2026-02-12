@@ -939,7 +939,7 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
 
 SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *state)
 {
-  u32 *p = (u32 *)state->framebuffer;
+  u32 *pixel = (u32 *)state->framebuffer;
   u32 x, y;
 
   u8 r = (u8)(255.0f * state->window_clear_color_r);
@@ -950,14 +950,14 @@ SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *state)
   {
     for (x = 0; x < state->framebuffer_width; ++x)
     {
-      *p++ = (r << 16) | (g << 8) | b;
+      *pixel++ = (r << 16) | (g << 8) | b;
     }
   }
 }
 
 SDF_CRAFT_API void framebuffer_debug(win32_sdf_craft_state *state)
 {
-  u32 *p = (u32 *)state->framebuffer;
+  u32 *pixel = (u32 *)state->framebuffer;
   u32 x, y;
 
   for (y = 0; y < state->framebuffer_height; ++y)
@@ -966,16 +966,119 @@ SDF_CRAFT_API void framebuffer_debug(win32_sdf_craft_state *state)
     {
       if (y < 8 && x < 8)
       {
-        *p++ = (0 << 16) | (255 << 8) | 0;
+        *pixel++ = (0 << 16) | (255 << 8) | 0;
       }
       else if (y > state->framebuffer_height - 8 && x > state->framebuffer_width - 8)
       {
-        *p++ = (255 << 16) | (0 << 8) | 0;
+        *pixel++ = (255 << 16) | (0 << 8) | 0;
       }
       else
       {
-        p++;
+        pixel++;
       }
+    }
+  }
+}
+
+#define SDF_MATH_PI2 6.28318530717958647692f
+#define SDF_MATH_LUT_SIZE 256
+
+static f32 sdf_math_lut[SDF_MATH_LUT_SIZE] = {
+    0.0000f, 0.0245f, 0.0491f, 0.0736f, 0.0980f, 0.1224f, 0.1467f, 0.1710f,
+    0.1951f, 0.2191f, 0.2430f, 0.2667f, 0.2903f, 0.3137f, 0.3369f, 0.3599f,
+    0.3827f, 0.4052f, 0.4276f, 0.4496f, 0.4714f, 0.4929f, 0.5141f, 0.5350f,
+    0.5556f, 0.5758f, 0.5957f, 0.6152f, 0.6344f, 0.6532f, 0.6716f, 0.6895f,
+    0.7071f, 0.7242f, 0.7409f, 0.7572f, 0.7730f, 0.7883f, 0.8032f, 0.8176f,
+    0.8315f, 0.8449f, 0.8577f, 0.8701f, 0.8819f, 0.8932f, 0.9040f, 0.9142f,
+    0.9239f, 0.9330f, 0.9415f, 0.9495f, 0.9569f, 0.9638f, 0.9700f, 0.9757f,
+    0.9808f, 0.9853f, 0.9892f, 0.9925f, 0.9952f, 0.9973f, 0.9988f, 0.9997f,
+    1.0000f, 0.9997f, 0.9988f, 0.9973f, 0.9952f, 0.9925f, 0.9892f, 0.9853f,
+    0.9808f, 0.9757f, 0.9700f, 0.9638f, 0.9569f, 0.9495f, 0.9415f, 0.9330f,
+    0.9239f, 0.9142f, 0.9040f, 0.8932f, 0.8819f, 0.8701f, 0.8577f, 0.8449f,
+    0.8315f, 0.8176f, 0.8032f, 0.7883f, 0.7730f, 0.7572f, 0.7409f, 0.7242f,
+    0.7071f, 0.6895f, 0.6716f, 0.6532f, 0.6344f, 0.6152f, 0.5957f, 0.5758f,
+    0.5556f, 0.5350f, 0.5141f, 0.4929f, 0.4714f, 0.4496f, 0.4276f, 0.4052f,
+    0.3827f, 0.3599f, 0.3369f, 0.3137f, 0.2903f, 0.2667f, 0.2430f, 0.2191f,
+    0.1951f, 0.1710f, 0.1467f, 0.1224f, 0.0980f, 0.0736f, 0.0491f, 0.0245f,
+    0.0000f, -0.0245f, -0.0491f, -0.0736f, -0.0980f, -0.1224f, -0.1467f, -0.1710f,
+    -0.1951f, -0.2191f, -0.2430f, -0.2667f, -0.2903f, -0.3137f, -0.3369f, -0.3599f,
+    -0.3827f, -0.4052f, -0.4276f, -0.4496f, -0.4714f, -0.4929f, -0.5141f, -0.5350f,
+    -0.5556f, -0.5758f, -0.5957f, -0.6152f, -0.6344f, -0.6532f, -0.6716f, -0.6895f,
+    -0.7071f, -0.7242f, -0.7409f, -0.7572f, -0.7730f, -0.7883f, -0.8032f, -0.8176f,
+    -0.8315f, -0.8449f, -0.8577f, -0.8701f, -0.8819f, -0.8932f, -0.9040f, -0.9142f,
+    -0.9239f, -0.9330f, -0.9415f, -0.9495f, -0.9569f, -0.9638f, -0.9700f, -0.9757f,
+    -0.9808f, -0.9853f, -0.9892f, -0.9925f, -0.9952f, -0.9973f, -0.9988f, -0.9997f,
+    -1.0000f, -0.9997f, -0.9988f, -0.9973f, -0.9952f, -0.9925f, -0.9892f, -0.9853f,
+    -0.9808f, -0.9757f, -0.9700f, -0.9638f, -0.9569f, -0.9495f, -0.9415f, -0.9330f,
+    -0.9239f, -0.9142f, -0.9040f, -0.8932f, -0.8819f, -0.8701f, -0.8577f, -0.8449f,
+    -0.8315f, -0.8176f, -0.8032f, -0.7883f, -0.7730f, -0.7572f, -0.7409f, -0.7242f,
+    -0.7071f, -0.6895f, -0.6716f, -0.6532f, -0.6344f, -0.6152f, -0.5957f, -0.5758f,
+    -0.5556f, -0.5350f, -0.5141f, -0.4929f, -0.4714f, -0.4496f, -0.4276f, -0.4052f,
+    -0.3827f, -0.3599f, -0.3369f, -0.3137f, -0.2903f, -0.2667f, -0.2430f, -0.2191f,
+    -0.1951f, -0.1710f, -0.1467f, -0.1224f, -0.0980f, -0.0736f, -0.0491f, -0.0245f};
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 sdf_math_sinf(f32 x)
+{
+  f32 index, frac;
+  i32 i, i2;
+
+  x -= SDF_MATH_PI2 * (f32)((i32)(x * (1.0f / SDF_MATH_PI2)));
+
+  if (x < 0)
+  {
+    x += SDF_MATH_PI2;
+  }
+
+  index = x * (SDF_MATH_LUT_SIZE / SDF_MATH_PI2);
+  i = (i32)index;
+  frac = index - (f32)i;
+
+  i &= (SDF_MATH_LUT_SIZE - 1);
+  i2 = (i + 1) & (SDF_MATH_LUT_SIZE - 1);
+
+  return (sdf_math_lut[i] + frac * (sdf_math_lut[i2] - sdf_math_lut[i]));
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
+{
+  if (v <= 0.0f)
+  {
+    return 0;
+  }
+  if (v >= 1.0f)
+  {
+    return 255;
+  }
+  return (u8)(v * 255.0f + 0.5f);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
+{
+  return (float_to_u8(b) << 16) | (float_to_u8(g) << 8) | float_to_u8(r);
+}
+
+SDF_CRAFT_API u32 sdf_craft_pixel_process(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
+{
+  f32 uv_x = frag_coord_x / (f32)state->framebuffer_width;
+  f32 uv_y = frag_coord_y / (f32)state->framebuffer_height;
+
+  /* Gradient Color change based on iTime (elapsed seconds) */
+  return rgbf_to_u32(
+      uv_x,
+      uv_y,
+      0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
+}
+
+SDF_CRAFT_API void sdf_craft_main_image(win32_sdf_craft_state *state)
+{
+  u32 *pixel = (u32 *)state->framebuffer;
+  u32 x, y;
+
+  for (y = 0; y < state->framebuffer_height; ++y)
+  {
+    for (x = 0; x < state->framebuffer_width; ++x)
+    {
+      *pixel++ = sdf_craft_pixel_process(state, (f32)x + 0.5f, (f32)y + 0.5f);
     }
   }
 }
@@ -1134,6 +1237,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /******************************/
       framebuffer_clear(&state);
       framebuffer_debug(&state);
+      sdf_craft_main_image(&state);
 
       StretchDIBits(
           state.device_context,
