@@ -1368,12 +1368,14 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
   win32_sdf_craft_state state = {0};
   state.running = 1;
   state.window_title = "sdf_craft v0.1";
-  state.window_width = 300;
-  state.window_height = 225;
+  state.framebuffer_width = 300;
+  state.framebuffer_height = 225;
+  state.window_width = state.framebuffer_width * 2;
+  state.window_height = state.framebuffer_height * 2;
   state.window_clear_color_r = 0.2f;
   state.window_clear_color_g = 0.2f;
   state.window_clear_color_b = 0.2f;
-  state.target_frames_per_second = 60; /* 60 FPS, 0 = unlimited */
+  state.target_frames_per_second = 30; /* 30 FPS, 0 = unlimited */
 
   (void)argc;
   (void)argv;
@@ -1504,7 +1506,8 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       {
         state.window_width = state.window_width_pending;
         state.window_height = state.window_height_pending;
-        win32_resize_framebuffer(&state, state.window_width, state.window_height);
+
+        win32_resize_framebuffer(&state, state.framebuffer_width, state.framebuffer_height);
         state.window_size_changed = 0;
       }
 
