@@ -1057,6 +1057,15 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
   return (float_to_u8(b) << 16) | (float_to_u8(g) << 8) | float_to_u8(r);
 }
 
+/* GLSL mainImage pixel processing
+ *
+ * void mainImage(out vec4 outColor, in vec2 fragCoord)
+ * {
+ *   vec2 uv = fragCoord / iResolution.xy;
+ *   float t = iTime;
+ *   outColor = vec4(uv, 0.5 + 0.5 * sin(t), 1.0);
+ * }
+ */
 SDF_CRAFT_API u32 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
 {
   f32 uv_x = frag_coord_x / (f32)state->framebuffer_width;
@@ -1069,6 +1078,14 @@ SDF_CRAFT_API u32 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_co
       0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
 }
 
+/* GLSL main fragment shader entry point
+ *
+ * void main()
+ * {
+ *   vec2 fragCoord = gl_FragCoord.xy;
+ *   mainImage(FragColor, fragCoord);
+ * }
+ */
 SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
 {
   u32 *pixel = (u32 *)state->framebuffer;
