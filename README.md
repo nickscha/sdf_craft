@@ -2,7 +2,7 @@
 A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler entirely running on the CPU.
 
 <p align="center">
-<a href="https://github.com/nickscha/sdf_craft"><img src="assets/sdf_craft.png"></a>
+<a href="https://github.com/nickscha/sdf_craft"><img src="assets/sdf_sphere.png"></a>
 </p>
 
 > [!WARNING]
