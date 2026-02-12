@@ -208,36 +208,6 @@ typedef struct MSG
   u32 lPrivate;
 } MSG;
 
-typedef struct PIXELFORMATDESCRIPTOR
-{
-  u16 nSize;
-  u16 nVersion;
-  u32 dwFlags;
-  u8 iPixelType;
-  u8 cColorBits;
-  u8 cRedBits;
-  u8 cRedShift;
-  u8 cGreenBits;
-  u8 cGreenShift;
-  u8 cBlueBits;
-  u8 cBlueShift;
-  u8 cAlphaBits;
-  u8 cAlphaShift;
-  u8 cAccumBits;
-  u8 cAccumRedBits;
-  u8 cAccumGreenBits;
-  u8 cAccumBlueBits;
-  u8 cAccumAlphaBits;
-  u8 cDepthBits;
-  u8 cStencilBits;
-  u8 cAuxBuffers;
-  u8 iLayerType;
-  u8 bReserved;
-  u32 dwLayerMask;
-  u32 dwVisibleMask;
-  u32 dwDamageMask;
-} PIXELFORMATDESCRIPTOR;
-
 typedef struct FILETIME
 {
   u32 dwLowDateTime;
@@ -324,28 +294,6 @@ typedef struct PROCESS_MEMORY_COUNTERS_EX
   u64 PrivateUsage;
 } PROCESS_MEMORY_COUNTERS_EX;
 
-typedef struct THREADENTRY32
-{
-  u32 dwSize;
-  u32 cntUsage;
-  u32 th32ThreadID;
-  u32 th32OwnerProcessID;
-  i32 tpBasePri;
-  i32 tpDeltaPri;
-  u32 dwFlags;
-} THREADENTRY32;
-
-typedef struct WINDOWPLACEMENT
-{
-  u32 length;
-  u32 flags;
-  u32 showCmd;
-  POINT ptMinPosition;
-  POINT ptMaxPosition;
-  RECT rcNormalPosition;
-  RECT rcDevice;
-} WINDOWPLACEMENT;
-
 typedef struct MONITORINFO
 {
   u32 cbSize;
@@ -414,9 +362,6 @@ WIN32_API(void *) CreateWindowExA(u32 dwExStyle, s8 *lpClassName, s8 *lpWindowNa
 WIN32_API(void *) GetDC(void *hWnd);
 WIN32_API(i32)    ReleaseDC(void *hWnd, void *hDC);
 WIN32_API(i32)    SwapBuffers(void *unnamedParam1);
-WIN32_API(i32)    ChoosePixelFormat(void *hdc, PIXELFORMATDESCRIPTOR *ppfd);
-WIN32_API(i32)    SetPixelFormat(void *hdc, i32 format, PIXELFORMATDESCRIPTOR *ppfd);
-WIN32_API(i32)    DescribePixelFormat(void *hdc, i32 iPixelFormat, u32 nBytes, PIXELFORMATDESCRIPTOR* ppfd);
 WIN32_API(i32)    ShowWindow(void *hWnd, i32 nCmdShow);
 WIN32_API(i32)    DestroyWindow(void *hWnd);
 WIN32_API(i32)    AdjustWindowRect(RECT* lpRect, u32 dwStyle, i32 bMenu);
@@ -427,29 +372,13 @@ WIN32_API(i32)    RegisterRawInputDevices(RAWINPUTDEVICE* pRawInputDevices, u32 
 WIN32_API(u32)    GetRawInputData(void *hRawInput, u32 uiCommand, void *pData, u32 *pcbSize, u32 cbSizeHeader);
 WIN32_API(i32)    GetCursorPos(POINT *lpPoint);
 WIN32_API(i32)    ScreenToClient(void *hWnd, POINT *lpPoint);
-WIN32_API(i32)    StretchDIBits(
- void* hdc,
- i32 xDest,
- i32 yDest,
- i32 DestWidth,
- i32 DestHeight,
- i32 xSrc,
- i32 ySrc,
- i32 SrcWidth,
- i32 SrcHeight,
- void *lpBits,
- BITMAPINFO *lpbmi,
- u32 iUsage,
- u32 rop
-);
+WIN32_API(i32)    StretchDIBits(void* hdc, i32 xDest, i32 yDest, i32 DestWidth, i32 DestHeight, i32 xSrc, i32 ySrc, i32 SrcWidth, i32 SrcHeight, void *lpBits, BITMAPINFO *lpbmi, u32 iUsage, u32 rop);
 
 WIN32_API(i32)    GetWindowLongA(void *hWnd, i32 nIndex);
-WIN32_API(i32)    GetWindowPlacement(void *hWnd, WINDOWPLACEMENT *lpwndpl);
 WIN32_API(i32)    GetMonitorInfoA(void *hMonitor, MONITORINFO* lpmi);
 WIN32_API(void *) MonitorFromWindow(void *hwnd, u32 dwFlags);
 WIN32_API(i32)    SetWindowLongA(void *hWnd, i32 nIndex, i32 dwNewLong);
 WIN32_API(i32)    SetWindowPos(void *hWnd, void *hWndInsertAfter, i32 X, i32 Y, i32 cx, i32 cy, u32 uFlags);
-WIN32_API(i32)    SetWindowPlacement(void *hWnd, WINDOWPLACEMENT *lpwndpl);
 WIN32_API(i32)    GetClientRect(void *hWnd, RECT* lpRect);
 
 WIN32_API(void *) GetCurrentProcess(void);
@@ -458,10 +387,6 @@ WIN32_API(i32)    SetPriorityClass(void *hProcess, u32 dwPriorityClass);
 WIN32_API(void *) GetCurrentThread(void);
 WIN32_API(i32)    SetThreadPriority(void *hThread, i32 nPriority);
 WIN32_API(u32)    SetThreadExecutionState(u32 esFlags);
-WIN32_API(i32)    GetProcessHandleCount(void* hProcess, u32* pdwHandleCount);
-WIN32_API(void *) CreateToolhelp32Snapshot(u32 dwFlags, u32 th32ProcessID);
-WIN32_API(i32)    Thread32First(void* hSnapshot, THREADENTRY32* lpte);
-WIN32_API(i32)    Thread32Next(void* hSnapshot, THREADENTRY32* lpte);
 /* clang-format on */
 
 /* #############################################################################
@@ -935,49 +860,6 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
   s->framebuffer_info.bmiHeader.biHeight = (i32)h; /* h = down-top, -h = top-down */
   s->framebuffer_info.bmiHeader.biPlanes = 1;
   s->framebuffer_info.bmiHeader.biBitCount = 32;
-}
-
-void framebuffer_clear(win32_sdf_craft_state *state)
-{
-  u32 *pixel = (u32 *)state->framebuffer;
-  u32 x, y;
-
-  u8 r = (u8)(255.0f * state->window_clear_color_r);
-  u8 g = (u8)(255.0f * state->window_clear_color_g);
-  u8 b = (u8)(255.0f * state->window_clear_color_b);
-
-  for (y = 0; y < state->framebuffer_height; ++y)
-  {
-    for (x = 0; x < state->framebuffer_width; ++x)
-    {
-      *pixel++ = (r << 16) | (g << 8) | b;
-    }
-  }
-}
-
-void framebuffer_debug(win32_sdf_craft_state *state)
-{
-  u32 *pixel = (u32 *)state->framebuffer;
-  u32 x, y;
-
-  for (y = 0; y < state->framebuffer_height; ++y)
-  {
-    for (x = 0; x < state->framebuffer_width; ++x)
-    {
-      if (y < 8 && x < 8)
-      {
-        *pixel++ = (0 << 16) | (255 << 8) | 0;
-      }
-      else if (y > state->framebuffer_height - 8 && x > state->framebuffer_width - 8)
-      {
-        *pixel++ = (255 << 16) | (0 << 8) | 0;
-      }
-      else
-      {
-        pixel++;
-      }
-    }
-  }
 }
 
 #define SDF_MATH_PI2 6.28318530717958647692f
@@ -1629,10 +1511,6 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /******************************/
       /* Main Logic                 */
       /******************************/
-      /*
-      framebuffer_clear(&state);
-      framebuffer_debug(&state);
-      */
       sdf_craft_main(&state);
 
       StretchDIBits(
