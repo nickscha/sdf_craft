@@ -1054,7 +1054,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
 
 SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
 {
-  return (float_to_u8(b) << 16) | (float_to_u8(g) << 8) | float_to_u8(r);
+  return (float_to_u8(r) << 16) | (float_to_u8(g) << 8) | float_to_u8(b);
 }
 
 /* GLSL mainImage pixel processing
