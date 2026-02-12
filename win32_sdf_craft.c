@@ -937,7 +937,7 @@ SDF_CRAFT_API void win32_resize_framebuffer(win32_sdf_craft_state *s, u32 w, u32
   s->framebuffer_info.bmiHeader.biBitCount = 32;
 }
 
-SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *state)
+void framebuffer_clear(win32_sdf_craft_state *state)
 {
   u32 *pixel = (u32 *)state->framebuffer;
   u32 x, y;
@@ -955,7 +955,7 @@ SDF_CRAFT_API void framebuffer_clear(win32_sdf_craft_state *state)
   }
 }
 
-SDF_CRAFT_API void framebuffer_debug(win32_sdf_craft_state *state)
+void framebuffer_debug(win32_sdf_craft_state *state)
 {
   u32 *pixel = (u32 *)state->framebuffer;
   u32 x, y;
@@ -1629,8 +1629,10 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /******************************/
       /* Main Logic                 */
       /******************************/
+      /*
       framebuffer_clear(&state);
       framebuffer_debug(&state);
+      */
       sdf_craft_main(&state);
 
       StretchDIBits(
