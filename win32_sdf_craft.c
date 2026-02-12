@@ -1057,7 +1057,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u32 rgbf_to_u32(f32 r, f32 g, f32 b)
   return (float_to_u8(b) << 16) | (float_to_u8(g) << 8) | float_to_u8(r);
 }
 
-SDF_CRAFT_API u32 sdf_craft_pixel_process(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
+SDF_CRAFT_API u32 sdf_craft_main_image(win32_sdf_craft_state *state, f32 frag_coord_x, f32 frag_coord_y)
 {
   f32 uv_x = frag_coord_x / (f32)state->framebuffer_width;
   f32 uv_y = frag_coord_y / (f32)state->framebuffer_height;
@@ -1069,7 +1069,7 @@ SDF_CRAFT_API u32 sdf_craft_pixel_process(win32_sdf_craft_state *state, f32 frag
       0.5f + 0.5f * sdf_math_sinf((f32)state->iTime));
 }
 
-SDF_CRAFT_API void sdf_craft_main_image(win32_sdf_craft_state *state)
+SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
 {
   u32 *pixel = (u32 *)state->framebuffer;
   u32 x, y;
@@ -1078,7 +1078,7 @@ SDF_CRAFT_API void sdf_craft_main_image(win32_sdf_craft_state *state)
   {
     for (x = 0; x < state->framebuffer_width; ++x)
     {
-      *pixel++ = sdf_craft_pixel_process(state, (f32)x + 0.5f, (f32)y + 0.5f);
+      *pixel++ = sdf_craft_main_image(state, (f32)x + 0.5f, (f32)y + 0.5f);
     }
   }
 }
@@ -1237,7 +1237,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       /******************************/
       framebuffer_clear(&state);
       framebuffer_debug(&state);
-      sdf_craft_main_image(&state);
+      sdf_craft_main(&state);
 
       StretchDIBits(
           state.device_context,
