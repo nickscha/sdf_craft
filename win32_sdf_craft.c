@@ -1102,6 +1102,45 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 fast_exp(f32 x)
   return v.f;
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 clampf(f32 x, f32 a, f32 b)
+{
+  if (x < a)
+  {
+    return a;
+  }
+  if (x > b)
+  {
+    return b;
+  }
+  return x;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 absf(f32 x)
+{
+  return (x < 0.0f ? -x : x);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_minf(f32 a, f32 b)
+{
+  return ((a < b) ? a : b);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vm_maxf(f32 a, f32 b)
+{
+  return ((a > b) ? a : b);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 stepf(f32 edge, f32 x)
+{
+  return (x < edge) ? 0.0f : 1.0f;
+}
+
+f32 smin(f32 a, f32 b, f32 k)
+{
+  f32 h = vm_maxf(k - absf(a - b), 0.0f) / k;
+  return vm_minf(a, b) - h * h * h * k * (1.0f / 6.0f);
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE u8 float_to_u8(f32 v)
 {
   if (v <= 0.0f)
@@ -1244,7 +1283,12 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mulf(vec3 a, f32 value)
   return result;
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vm_v3_cross(vec3 a, vec3 b)
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 vec3_dot(vec3 a, vec3 b)
+{
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_cross(vec3 a, vec3 b)
 {
   vec3 result;
 
@@ -1292,8 +1336,9 @@ SDF_CRAFT_API f32 sdf_craft_map(win32_sdf_craft_state *state, vec3 pos)
 {
   vec3 sphere_pos = vec3_init(sdf_math_sinf((f32)state->iTime) * 0.3f, 0.0f, 0.0f);
   f32 sphere = sdSphere(vec3_sub(pos, sphere_pos), 0.25f);
+  f32 ground = pos.y - (-0.25f);
 
-  return sphere;
+  return smin(ground, sphere, 0.2f);
 }
 
 SDF_CRAFT_API vec3 calc_normal(win32_sdf_craft_state *state, vec3 pos)
@@ -1348,18 +1393,18 @@ SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_
   vec2 iResolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
 
   vec2 p = vec2_divf(vec2_sub(vec2_mulf(frag_coord, 2.0f), iResolution), iResolution.y);
-  f32 an = 0.1f * (f32)state->iTime;
 
   /*
-  vec3 ro = vec3_init(1.0f * sdf_math_sinf(an), 0.0f, 1.0f * sdf_math_cosf(an));
+    f32 angle = 0.1f * (f32)state->iTime;
+    vec3 ro = vec3_init(1.0f * sdf_math_sinf(angle), 0.0f, 1.0f * sdf_math_cosf(angle));
   */
 
   vec3 ro = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin */
   vec3 ta = vec3_init(0.0f, 0.0f, 0.0f);
 
   vec3 ww = vec3_normalize(vec3_sub(ta, ro));
-  vec3 uu = vec3_normalize(vm_v3_cross(ww, vec3_init(0.0f, 1.0f, 0.0f)));
-  vec3 vv = vec3_normalize(vm_v3_cross(uu, ww));
+  vec3 uu = vec3_normalize(vec3_cross(ww, vec3_init(0.0f, 1.0f, 0.0f)));
+  vec3 vv = vec3_normalize(vec3_cross(uu, ww));
 
   vec3 rd = vec3_normalize(vec3_add(vec3_add(vec3_mulf(uu, p.x), vec3_mulf(vv, p.y)), vec3_mulf(ww, 1.5f))); /* ray direction */
 
@@ -1368,14 +1413,23 @@ SDF_CRAFT_API vec3 sdf_craft_main_image(win32_sdf_craft_state *state, vec2 frag_
 
   t = sdf_craft_cast_ray(state, ro, rd);
 
-  (void)an;
-
   if (t > 0.0f)
   {
     vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
     vec3 nor = calc_normal(state, pos);
 
-    col = nor;
+    vec3 mate = vec3_init(0.18f, 0.18f, 0.18f);
+    vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
+    f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
+    f32 sun_sha = stepf(sdf_craft_cast_ray(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
+    f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, 1.0f, 0.0f)), 0.0f, 1.0f);
+    f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, -1.0f, 0.0f)), 0.0f, 1.0f);
+
+    col = vec3_mulf(vec3_mul(mate, vec3_init(7.0f, 4.5f, 3.0f)), sun_dif * sun_sha);
+    col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.5f, 0.8f, 0.9f)), sky_dif));
+    col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.7f, 0.3f, 0.2f)), bou_dif)); /* bounce light */
+
+    /* col = nor; */
   }
 
   return col;
@@ -1432,8 +1486,8 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
   win32_sdf_craft_state state = {0};
   state.running = 1;
   state.window_title = "sdf_craft v0.1";
-  state.window_width = 800;
-  state.window_height = 600;
+  state.window_width = 300;
+  state.window_height = 225;
   state.window_clear_color_r = 0.2f;
   state.window_clear_color_g = 0.2f;
   state.window_clear_color_b = 0.2f;
