@@ -67,7 +67,7 @@ win32_sdf_craft_x64.exe
 
 ## Roadmap
 
-For the next release of **CRAFT_IT** the following features are planend.
+For the next release of **SDF_CRAFT** the following features are planend.
 
 ### v0.1 Features
 - [x] Win32 ARM, x64 release build
