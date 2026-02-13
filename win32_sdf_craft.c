@@ -1042,6 +1042,28 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 powf(f32 base, f32 exponent)
   return (exp_approxf(exponent * ln_approxf(base)));
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 floorf(f32 x)
+{
+  i32 i = (i32)x;
+  return (x < 0.0f && x != (f32)i) ? (f32)(i - 1) : (f32)i;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 fmodf(f32 x, f32 y)
+{
+  f32 quotient;
+
+  /* Handle special cases where y is 0 */
+  if (y == 0.0f)
+  {
+    return (0.0f);
+  }
+
+  /* Compute the quotient (truncated towards zero) */
+  quotient = floorf(x / y);
+
+  return ((-quotient * y) + x);
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 absf(f32 x)
 {
   return (x < 0.0f ? -x : x);
@@ -1280,8 +1302,24 @@ SDF_CRAFT_API f32 sdf_sphere(vec3 pos, f32 radius)
 
 SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
 {
+  /*
   vec3 sphere_pos = vec3_init(sinf((f32)state->iTime) * 0.3f, cosf((f32)state->iTime) * 0.1f, 0.0f);
   f32 sphere = sdf_sphere(vec3_sub(pos, sphere_pos), 0.25f);
+  f32 ground = pos.y - (-0.25f);
+
+  return sminf(ground, sphere, 0.1f);
+  */
+  f32 spacing = 1.5f;
+
+  vec3 p = vec3_init(
+      fmodf(pos.x + spacing * 0.5f, spacing) - spacing * 0.5f,
+      pos.y,
+      fmodf(pos.z + spacing * 0.5f, spacing) - spacing * 0.5f);
+
+  vec3 sphere_pos = vec3_init(0.0f, sinf((f32)state->iTime) * 0.1f, 0.0f);
+  vec3 sphere_rel = vec3_sub(p, sphere_pos);
+
+  f32 sphere = sdf_sphere(sphere_rel, 0.25f);
   f32 ground = pos.y - (-0.25f);
 
   return sminf(ground, sphere, 0.1f);
