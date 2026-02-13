@@ -131,8 +131,8 @@ jobs:
 
 
             ## Downloads
-            - **win32_sdf_craft_x64.exe** (Windows x64, OpenGL 3.3)
-            - **win32_sdf_craft_arm.exe** (Windows ARM, OpenGL 3.3)
+            - **win32_sdf_craft_x64.exe** (Windows x64)
+            - **win32_sdf_craft_arm.exe** (Windows ARM)
             ---
 
             ### What's Included
