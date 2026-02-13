@@ -150,6 +150,8 @@ void *memset(void *dest, i32 c, u32 count)
 #define ES_DISPLAY_REQUIRED ((u32)0x00000002)
 #define ES_CONTINUOUS ((u32)0x80000000)
 
+#define INFINITE 0xFFFFFFFF
+
 typedef void *(*PROC)(void);
 typedef i64 (*WNDPROC)(void *, u32, u64, i64);
 
@@ -387,6 +389,12 @@ WIN32_API(i32)    SetPriorityClass(void *hProcess, u32 dwPriorityClass);
 WIN32_API(void *) GetCurrentThread(void);
 WIN32_API(i32)    SetThreadPriority(void *hThread, i32 nPriority);
 WIN32_API(u32)    SetThreadExecutionState(u32 esFlags);
+
+WIN32_API(u8)     SetEvent(void* hEvent);
+WIN32_API(void *) CreateEventA(void* lpEventAttributes, u8 bManualReset, u8 bInitialState, s8* lpName);
+WIN32_API(void*)  CreateThread(void* lpThreadAttributes, u32 dwStackSize, u32 (__stdcall *lpStartAddress)(void*), void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
+WIN32_API(u32)    WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
+WIN32_API(u32)    WaitForMultipleObjects(u32 nCount,void**lpHandles, u8 bWaitAll, u32 dwMilliseconds);
 /* clang-format on */
 
 /* #############################################################################
@@ -1541,7 +1549,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 f32_to_u8(f32 v)
  *   mainImage(FragColor, fragCoord);
  * }
  */
-SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s, sdf_state *sdf_state)
+void sdf_craft_main(win32_sdf_craft_state *s, sdf_state *sdf_state)
 {
   u32 *pixel = (u32 *)s->framebuffer;
   u32 x, y;
@@ -1556,6 +1564,114 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s, sdf_state *sdf_state
       *pixel++ = (f32_to_u8(color.x) << 16) | (f32_to_u8(color.y) << 8) | f32_to_u8(color.z);
     }
   }
+}
+
+typedef struct sdf_thread_job
+{
+  win32_sdf_craft_state *win;
+  sdf_state *sdf;
+
+  u32 y0;
+  u32 y1;
+
+  void *start_event;
+  void *done_event;
+
+} sdf_thread_job;
+
+u32 __stdcall sdf_worker_thread(void *param)
+{
+  sdf_thread_job *job = (sdf_thread_job *)param;
+
+  for (;;)
+  {
+    u32 x;
+    u32 y;
+    u32 w;
+    u32 *pixels;
+
+    WaitForSingleObject(job->start_event, INFINITE);
+
+    w = job->win->framebuffer_width;
+    pixels = (u32 *)job->win->framebuffer + job->y0 * w;
+
+    for (y = job->y0; y < job->y1; ++y)
+    {
+      for (x = 0; x < w; ++x)
+      {
+        vec2 frag = vec2_init((f32)x + 0.5f, (f32)y + 0.5f);
+        vec3 c = sdf_ray_march(job->sdf, frag);
+
+        *pixels++ =
+            (f32_to_u8(c.x) << 16) |
+            (f32_to_u8(c.y) << 8) |
+            f32_to_u8(c.z);
+      }
+    }
+
+    SetEvent(job->done_event);
+  }
+}
+
+#define MAX_THREADS 8
+
+typedef struct sdf_thread_pool
+{
+  void *threads[MAX_THREADS];
+  sdf_thread_job jobs[MAX_THREADS];
+  u32 thread_count;
+
+} sdf_thread_pool;
+
+void sdf_thread_pool_init(sdf_thread_pool *pool,
+                          win32_sdf_craft_state *win,
+                          sdf_state *sdf)
+{
+  u32 h;
+  u32 rows;
+  u32 i;
+
+  /* TODO: fixed thread count */
+  pool->thread_count = 8;
+
+  if (pool->thread_count > MAX_THREADS)
+  {
+    pool->thread_count = MAX_THREADS;
+  }
+
+  h = win->framebuffer_height;
+  rows = h / pool->thread_count;
+
+  for (i = 0; i < pool->thread_count; i++)
+  {
+    sdf_thread_job *j = &pool->jobs[i];
+
+    j->win = win;
+    j->sdf = sdf;
+
+    j->y0 = i * rows;
+    j->y1 = (i == pool->thread_count - 1) ? h : (i + 1) * rows;
+
+    j->start_event = CreateEventA(0, 0, 0, 0);
+    j->done_event = CreateEventA(0, 0, 0, 0);
+
+    pool->threads[i] = CreateThread(0, 0, sdf_worker_thread, j, 0, 0);
+  }
+}
+
+void sdf_craft_main_mt(sdf_thread_pool *pool)
+{
+  void *done_handles[MAX_THREADS];
+
+  u32 i;
+
+  for (i = 0; i < pool->thread_count; ++i)
+  {
+    SetEvent(pool->jobs[i].start_event);
+    done_handles[i] = pool->jobs[i].done_event;
+  }
+
+  WaitForMultipleObjects(pool->thread_count, done_handles, 1, INFINITE);
 }
 
 /* #############################################################################
@@ -1622,6 +1738,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
     /* SDF State Setup            */
     /******************************/
     sdf_state sdf_state = {0};
+    sdf_thread_pool sdf_thread_pool = {0};
 
     /* Basic information */
     sdf_state.world_up = vec3_init(0.0f, 1.0f, 0.0f);
@@ -1642,6 +1759,11 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
     sdf_state.sky_color = vec3_init(0.5f, 0.8f, 0.9f);
     sdf_state.bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
     sdf_state.specular_intensity = 0.05f;
+
+    /******************************/
+    /* SDF Multithreading Setup   */
+    /******************************/
+    sdf_thread_pool_init(&sdf_thread_pool, &state, &sdf_state);
 
     QueryPerformanceFrequency(&perf_freq);
     QueryPerformanceCounter(&time_start);
@@ -1748,7 +1870,10 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
       sdf_state.time = (f32)state.iTime;
       sdf_state.scene.transform_position = vec3_init(0.0f, sinf(sdf_state.time) * 0.1f, 0.0f);
 
+      /*
       sdf_craft_main(&state, &sdf_state);
+      */
+      sdf_craft_main_mt(&sdf_thread_pool);
 
       StretchDIBits(
           state.device_context,
