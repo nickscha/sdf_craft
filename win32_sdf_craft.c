@@ -1295,12 +1295,52 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
  * # [SECTION] SDF Raymarching
  * #############################################################################
  */
+typedef struct sdf_scene
+{
+  vec3 transform_position;
+  vec3 transform_rotation_axis;
+  f32 tranform_rotation_angle;
+  vec3 transform_scale;
+
+} sdf_scene;
+
+typedef struct sdf_state
+{
+  /* General information */
+  vec2 resolution; /* Framebuffer width and height in pixels  */
+  f32 time;        /* Time elapsed in seconds                 */
+  vec3 world_up;   /* World Up   (usually: 0.0f, 1.0f, 0.0f)  */
+  vec3 world_down; /* World Down (usually: 0.0f, -1.0f, 0.0f) */
+
+  /* Camera Setup */
+  vec3 camera_position; /* Ray origin */
+  vec3 camera_look_at;  /* Look at Target position */
+  vec3 camera_forward;
+  vec3 camera_right;
+  vec3 camera_up;
+  f32 camera_fov; /* 1.5f */
+
+  /* SDF Scene to Draw */
+  sdf_scene scene;
+
+  /* Lightning */
+  vec3 material_color;
+  vec3 sun_direction;
+  vec3 sun_color;
+  vec3 sky_color;
+  vec3 bounce_color;
+  f32 specular_intensity;
+
+  u8 visualize_normals_enabled;
+
+} sdf_state;
+
 SDF_CRAFT_API f32 sdf_sphere(vec3 pos, f32 radius)
 {
   return vec3_length(pos) - radius;
 }
 
-SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
+SDF_CRAFT_API f32 sdf_map(sdf_state *state, vec3 pos)
 {
   /*
   vec3 sphere_pos = vec3_init(sinf((f32)state->iTime) * 0.3f, cosf((f32)state->iTime) * 0.1f, 0.0f);
@@ -1316,7 +1356,7 @@ SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
       pos.y,
       fmodf(pos.z + spacing * 0.5f, spacing) - spacing * 0.5f);
 
-  vec3 sphere_pos = vec3_init(0.0f, sinf((f32)state->iTime) * 0.1f, 0.0f);
+  vec3 sphere_pos = vec3_init(0.0f, sinf(state->time) * 0.1f, 0.0f);
   vec3 sphere_rel = vec3_sub(p, sphere_pos);
 
   f32 sphere = sdf_sphere(sphere_rel, 0.25f);
@@ -1325,7 +1365,7 @@ SDF_CRAFT_API f32 sdf_map(win32_sdf_craft_state *state, vec3 pos)
   return sminf(ground, sphere, 0.1f);
 }
 
-SDF_CRAFT_API vec3 sdf_calc_normal(win32_sdf_craft_state *state, vec3 pos)
+SDF_CRAFT_API vec3 sdf_calc_normal(sdf_state *state, vec3 pos)
 {
   vec2 e = vec2_init(0.0001f, 0.0f);
   vec3 e_xyy = vec3_init(e.x, e.y, e.y);
@@ -1338,7 +1378,7 @@ SDF_CRAFT_API vec3 sdf_calc_normal(win32_sdf_craft_state *state, vec3 pos)
       sdf_map(state, vec3_add(pos, e_yyx)) - sdf_map(state, vec3_sub(pos, e_yyx))));
 }
 
-SDF_CRAFT_API f32 sdf_ray_cast(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
+SDF_CRAFT_API f32 sdf_ray_cast(sdf_state *state, vec3 ro, vec3 rd)
 {
   f32 t = 0.0;
   u32 i;
@@ -1370,12 +1410,7 @@ SDF_CRAFT_API f32 sdf_ray_cast(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
   return t;
 }
 
-SDF_CRAFT_API f32 sdf_soft_shadow(
-    win32_sdf_craft_state *state,
-    vec3 ro,
-    vec3 rd,
-    f32 tmin,
-    f32 tmax)
+SDF_CRAFT_API f32 sdf_soft_shadow(sdf_state *state, vec3 ro, vec3 rd, f32 tmin, f32 tmax)
 {
   f32 shadow_smoothness = 8.0f; /* 16.0f = sharper, 4.0f = softer */
   f32 res = 1.0f;
@@ -1404,10 +1439,7 @@ SDF_CRAFT_API f32 sdf_soft_shadow(
   return clampf(res, 0.0f, 1.0f);
 }
 
-SDF_CRAFT_API f32 sdf_fast_ao(
-    win32_sdf_craft_state *state,
-    vec3 pos,
-    vec3 nor)
+SDF_CRAFT_API f32 sdf_fast_ao(sdf_state *state, vec3 pos, vec3 nor)
 {
   f32 occ = 0.0f;
   f32 sca = 1.0f;
@@ -1432,45 +1464,25 @@ SDF_CRAFT_API f32 sdf_fast_ao(
   return clampf(1.0f - 3.0f * occ, 0.0f, 1.0f);
 }
 
-SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
+SDF_CRAFT_API vec3 sdf_ray_march(sdf_state *state, vec2 frag_coord)
 {
   f32 t;
 
-  vec2 iResolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
-
-  vec2 p = vec2_divf(vec2_sub(vec2_mulf(frag_coord, 2.0f), iResolution), iResolution.y);
-
-  vec3 ray_origin = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin (camera position) */
-  vec3 look_at_target = vec3_init(0.0f, 0.0f, 0.0f);
-
-  /* Camera Setup:
-   *
-   *     vv  = camera up
-   *     |
-   *     |
-   *     o---- uu = camera right
-   *    /
-   *  ww = camera forward (view direction)
-   */
-  vec3 world_up = vec3_init(0.0f, 1.0f, 0.0f);
-  vec3 world_down = vec3_init(0.0f, -1.0f, 0.0f);
-  vec3 forward = vec3_normalize(vec3_sub(look_at_target, ray_origin)); /* Z-Axis */
-  vec3 right = vec3_normalize(vec3_cross(forward, world_up));          /* X-Axis */
-  vec3 up = vec3_normalize(vec3_cross(right, forward));                /* Y-Axis */
+  vec2 p = vec2_divf(vec2_sub(vec2_mulf(frag_coord, 2.0f), state->resolution), state->resolution.y);
 
   vec3 ray_direction = vec3_normalize(vec3_add2(
-      vec3_mulf(right, p.x),      /* horizontal screen offset */
-      vec3_mulf(up, p.y),         /* vertical screen offset */
-      vec3_mulf(forward, 1.5f))); /* forward push (fov) */
+      vec3_mulf(state->camera_right, p.x),                   /* horizontal screen offset */
+      vec3_mulf(state->camera_up, p.y),                      /* vertical screen offset */
+      vec3_mulf(state->camera_forward, state->camera_fov))); /* forward push (fov) */
 
   vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * ray_direction.y);        /* sky, darker the higher */
   col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), expf(-10.0f * ray_direction.y)); /* above ground light horizon */
 
-  t = sdf_ray_cast(state, ray_origin, ray_direction);
+  t = sdf_ray_cast(state, state->camera_position, ray_direction);
 
   if (t > 0.0f)
   {
-    vec3 pos = vec3_add(ray_origin, vec3_mulf(ray_direction, t));
+    vec3 pos = vec3_add(state->camera_position, vec3_mulf(ray_direction, t));
     vec3 nor = sdf_calc_normal(state, pos);
     f32 ao = sdf_fast_ao(state, pos, nor);
 
@@ -1480,19 +1492,13 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
     }
     else
     {
-      vec3 material = vec3_init(0.18f, 0.18f, 0.18f);
-      vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
-      f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
+      f32 sun_dif = clampf(vec3_dot(nor, state->sun_direction), 0.0f, 1.0f);
       /* f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f); */
-      f32 sun_sha = sdf_soft_shadow(state, vec3_add(pos, vec3_mulf(nor, 0.01f)), sun_dir, 0.02f, 5.0f);
-      f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_up), 0.0f, 1.0f);
-      f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_down), 0.0f, 1.0f);
+      f32 sun_sha = sdf_soft_shadow(state, vec3_add(pos, vec3_mulf(nor, 0.01f)), state->sun_direction, 0.02f, 5.0f);
+      f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, state->world_up), 0.0f, 1.0f);
+      f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, state->world_down), 0.0f, 1.0f);
 
-      vec3 sun_color = vec3_init(7.0f, 4.5f, 3.0f);
-      vec3 sky_color = vec3_init(0.5f, 0.8f, 0.9f);
-      vec3 bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
-
-      vec3 halfv = vec3_normalize(vec3_add(sun_dir, vec3_neg(ray_direction)));
+      vec3 halfv = vec3_normalize(vec3_add(state->sun_direction, vec3_neg(ray_direction)));
 
       f32 specular = clampf(vec3_dot(nor, halfv), 0.0f, 1.0f);
       specular = specular * specular;
@@ -1500,31 +1506,14 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
       specular = specular * specular; /* ^8 */
       specular = specular * sun_dif * sun_sha;
 
-      col = vec3_mulf(vec3_mul(material, sun_color), sun_dif * sun_sha);
-      col = vec3_add(col, vec3_mulf(vec3_mul(material, sky_color), sky_dif * ao));
-      col = vec3_add(col, vec3_mulf(vec3_mul(material, bounce_color), bou_dif * ao)); /* bounce light */
-      col = vec3_add(col, vec3_mulf(sun_color, specular * 0.05f));
+      col = vec3_mulf(vec3_mul(state->material_color, state->sun_color), sun_dif * sun_sha);
+      col = vec3_add(col, vec3_mulf(vec3_mul(state->material_color, state->sky_color), sky_dif * ao));
+      col = vec3_add(col, vec3_mulf(vec3_mul(state->material_color, state->bounce_color), bou_dif * ao)); /* bounce light */
+      col = vec3_add(col, vec3_mulf(state->sun_color, specular * 0.05f));
     }
   }
 
   return col;
-}
-
-/* GLSL mainImage pixel processing
- *
- * void mainImage(out vec4 outColor, in vec2 fragCoord)
- * {
- *   vec2 uv = fragCoord / iResolution.xy;
- *   float t = iTime;
- *   outColor = vec4(uv, 0.5 + 0.5 * sin(t), 1.0);
- * }
- */
-vec3 sdf_ray_march_gradient(win32_sdf_craft_state *state, vec2 frag_coord)
-{
-  vec2 resolution = vec2_init((f32)state->framebuffer_width, (f32)state->framebuffer_height);
-  vec2 uv = vec2_div(frag_coord, resolution);
-
-  return vec3_init(uv.x, uv.y, 0.5f + 0.5f * sinf((f32)state->iTime));
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE u8 f32_to_u8(f32 v)
@@ -1548,17 +1537,39 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 f32_to_u8(f32 v)
  *   mainImage(FragColor, fragCoord);
  * }
  */
-SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *state)
+SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
 {
-  u32 *pixel = (u32 *)state->framebuffer;
+  u32 *pixel = (u32 *)s->framebuffer;
   u32 x, y;
 
-  for (y = 0; y < state->framebuffer_height; ++y)
+  sdf_state state = {0};
+  state.resolution = vec2_init((f32)s->framebuffer_width, (f32)s->framebuffer_height);
+  state.time = (f32)s->iTime;
+  state.world_up = vec3_init(0.0f, 1.0f, 0.0f);
+  state.world_down = vec3_init(0.0f, -1.0f, 0.0f);
+
+  state.camera_position = vec3_init(0.0f, 0.0f, 1.0f);
+  state.camera_look_at = vec3_init(0.0f, 0.0f, 0.0f);
+  state.camera_forward = vec3_normalize(vec3_sub(state.camera_look_at, state.camera_position)); /* Z-Axis */
+  state.camera_right = vec3_normalize(vec3_cross(state.camera_forward, state.world_up));        /* X-Axis */
+  state.camera_up = vec3_normalize(vec3_cross(state.camera_right, state.camera_forward));       /* Y-Axis */
+  state.camera_fov = 1.5f;
+
+  state.material_color = vec3_init(0.18f, 0.18f, 0.18f);
+  state.sun_direction = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
+  state.sun_color = vec3_init(7.0f, 4.5f, 3.0f);
+  state.sky_color = vec3_init(0.5f, 0.8f, 0.9f);
+  state.bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
+  state.specular_intensity = 0.05f;
+
+  state.visualize_normals_enabled = s->visualize_normals_enabled;
+
+  for (y = 0; y < s->framebuffer_height; ++y)
   {
-    for (x = 0; x < state->framebuffer_width; ++x)
+    for (x = 0; x < s->framebuffer_width; ++x)
     {
       vec2 frag_coord = vec2_init((f32)x + 0.5f, (f32)y + 0.5f);
-      vec3 color = sdf_ray_march(state, frag_coord);
+      vec3 color = sdf_ray_march(&state, frag_coord);
 
       *pixel++ = (f32_to_u8(color.x) << 16) | (f32_to_u8(color.y) << 8) | f32_to_u8(color.z);
     }
