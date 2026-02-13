@@ -1118,6 +1118,17 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_add(vec3 a, vec3 b)
   return result;
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_add2(vec3 a, vec3 b, vec3 c)
+{
+  vec3 result = a;
+
+  result.x += b.x + c.x;
+  result.y += b.y + c.y;
+  result.z += b.z + c.z;
+
+  return result;
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_sub(vec3 a, vec3 b)
 {
   vec3 result = a;
@@ -1175,21 +1186,23 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_cross(vec3 a, vec3 b)
   result.y = (a.z * b.x) - (a.x * b.z);
   result.z = (a.x * b.y) - (a.y * b.x);
 
-  return (result);
+  return result;
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mix(vec3 a, vec3 b, f32 t)
 {
-  vec3 r;
-  r.x = mixf(a.x, b.x, t);
-  r.y = mixf(a.y, b.y, t);
-  r.z = mixf(a.z, b.z, t);
-  return r;
+  vec3 result;
+
+  result.x = mixf(a.x, b.x, t);
+  result.y = mixf(a.y, b.y, t);
+  result.z = mixf(a.z, b.z, t);
+
+  return result;
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 vec3_length(vec3 a)
 {
-  return (sqrtf(a.x * a.x + a.y * a.y + a.z * a.z));
+  return sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
 }
 
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
@@ -1203,7 +1216,7 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_normalize(vec3 a)
   result.y = a.y * scalar;
   result.z = a.z * scalar;
 
-  return (result);
+  return result;
 }
 
 /* #############################################################################
@@ -1289,11 +1302,16 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
    *    /
    *  ww = camera forward (view direction)
    */
-  vec3 forward = vec3_normalize(vec3_sub(look_at_target, ray_origin));           /* Z-Axis */
-  vec3 right = vec3_normalize(vec3_cross(forward, vec3_init(0.0f, 1.0f, 0.0f))); /* X-Axis */
-  vec3 up = vec3_normalize(vec3_cross(right, forward));                          /* Y-Axis */
+  vec3 world_up = vec3_init(0.0f, 1.0f, 0.0f);
+  vec3 world_down = vec3_init(0.0f, -1.0f, 0.0f);
+  vec3 forward = vec3_normalize(vec3_sub(look_at_target, ray_origin)); /* Z-Axis */
+  vec3 right = vec3_normalize(vec3_cross(forward, world_up));          /* X-Axis */
+  vec3 up = vec3_normalize(vec3_cross(right, forward));                /* Y-Axis */
 
-  vec3 ray_direction = vec3_normalize(vec3_add(vec3_add(vec3_mulf(right, p.x), vec3_mulf(up, p.y)), vec3_mulf(forward, 1.5f))); /* ray direction */
+  vec3 ray_direction = vec3_normalize(vec3_add2(
+      vec3_mulf(right, p.x),      /* horizontal screen offset */
+      vec3_mulf(up, p.y),         /* vertical screen offset */
+      vec3_mulf(forward, 1.5f))); /* forward push (fov) */
 
   vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * ray_direction.y);        /* sky, darker the higher */
   col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), expf(-10.0f * ray_direction.y)); /* above ground light horizon */
@@ -1311,16 +1329,20 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
     }
     else
     {
-      vec3 mate = vec3_init(0.18f, 0.18f, 0.18f);
+      vec3 material = vec3_init(0.18f, 0.18f, 0.18f);
       vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
       f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
       f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
-      f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, 1.0f, 0.0f)), 0.0f, 1.0f);
-      f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, vec3_init(0.0f, -1.0f, 0.0f)), 0.0f, 1.0f);
+      f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_up), 0.0f, 1.0f);
+      f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_down), 0.0f, 1.0f);
 
-      col = vec3_mulf(vec3_mul(mate, vec3_init(7.0f, 4.5f, 3.0f)), sun_dif * sun_sha);
-      col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.5f, 0.8f, 0.9f)), sky_dif));
-      col = vec3_add(col, vec3_mulf(vec3_mul(mate, vec3_init(0.7f, 0.3f, 0.2f)), bou_dif)); /* bounce light */
+      vec3 sun_color = vec3_init(7.0f, 4.5f, 3.0f);
+      vec3 sky_color = vec3_init(0.5f, 0.8f, 0.9f);
+      vec3 bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
+
+      col = vec3_mulf(vec3_mul(material, sun_color), sun_dif * sun_sha);
+      col = vec3_add(col, vec3_mulf(vec3_mul(material, sky_color), sky_dif));
+      col = vec3_add(col, vec3_mulf(vec3_mul(material, bounce_color), bou_dif)); /* bounce light */
     }
   }
 
