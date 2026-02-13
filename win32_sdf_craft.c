@@ -1458,7 +1458,7 @@ SDF_CRAFT_API f32 sdf_soft_shadow(sdf_state *state, vec3 ro, vec3 rd, f32 tmin, 
   return clampf(res, 0.0f, 1.0f);
 }
 
-SDF_CRAFT_API f32 sdf_fast_ao(sdf_state *state, vec3 pos, vec3 nor)
+SDF_CRAFT_API f32 sdf_ambient_occlusion(sdf_state *state, vec3 pos, vec3 nor)
 {
   f32 occ = 0.0f;
   f32 sca = 1.0f;
@@ -1510,7 +1510,7 @@ SDF_CRAFT_API vec3 sdf_ray_march(sdf_state *state, vec2 frag_coord)
     }
     else
     {
-      f32 ao = sdf_fast_ao(state, pos, nor);
+      f32 ao = sdf_ambient_occlusion(state, pos, nor);
 
       f32 sun_dif = clampf(vec3_dot(nor, state->sun_direction), 0.0f, 1.0f);
       /* f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f); */
