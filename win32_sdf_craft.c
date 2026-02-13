@@ -1195,6 +1195,17 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_add2(vec3 a, vec3 b, vec3 c)
   return result;
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_add3(vec3 a, vec3 b, vec3 c, vec3 d)
+{
+  vec3 result = a;
+
+  result.x += b.x + c.x + d.x;
+  result.y += b.y + c.y + d.y;
+  result.z += b.z + c.z + d.z;
+
+  return result;
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_sub(vec3 a, vec3 b)
 {
   vec3 result = a;
@@ -1372,15 +1383,18 @@ SDF_CRAFT_API f32 sdf_map(sdf_state *state, vec3 pos)
 
 SDF_CRAFT_API vec3 sdf_calc_normal(sdf_state *state, vec3 pos)
 {
-  vec2 e = vec2_init(0.0001f, 0.0f);
-  vec3 e_xyy = vec3_init(e.x, e.y, e.y);
-  vec3 e_yxy = vec3_init(e.y, e.x, e.y);
-  vec3 e_yyx = vec3_init(e.y, e.y, e.x);
+  static f32 e = 0.0005f;
 
-  return vec3_normalize(vec3_init(
-      sdf_map(state, vec3_add(pos, e_xyy)) - sdf_map(state, vec3_sub(pos, e_xyy)),
-      sdf_map(state, vec3_add(pos, e_yxy)) - sdf_map(state, vec3_sub(pos, e_yxy)),
-      sdf_map(state, vec3_add(pos, e_yyx)) - sdf_map(state, vec3_sub(pos, e_yyx))));
+  vec3 k1 = vec3_init(1, -1, -1);
+  vec3 k2 = vec3_init(-1, -1, 1);
+  vec3 k3 = vec3_init(-1, 1, -1);
+  vec3 k4 = vec3_init(1, 1, 1);
+
+  return vec3_normalize(vec3_add3(
+      vec3_mulf(k1, sdf_map(state, vec3_add(pos, vec3_mulf(k1, e)))),
+      vec3_mulf(k2, sdf_map(state, vec3_add(pos, vec3_mulf(k2, e)))),
+      vec3_mulf(k3, sdf_map(state, vec3_add(pos, vec3_mulf(k3, e)))),
+      vec3_mulf(k4, sdf_map(state, vec3_add(pos, vec3_mulf(k4, e))))));
 }
 
 SDF_CRAFT_API f32 sdf_ray_cast(sdf_state *state, vec3 ro, vec3 rd)
