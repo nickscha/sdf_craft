@@ -1003,6 +1003,45 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 clampf(f32 x, f32 a, f32 b)
   return x;
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 ln_approxf(f32 x)
+{
+  f32 y = (x - 1.0f) / (x + 1.0f);
+  f32 y2 = y * y;
+  return (2.0f * (y + (y2 * y) / 3.0f));
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 exp_approxf(f32 x)
+{
+  f32 term = 1.0f;
+  f32 sum = 1.0f;
+  i32 i;
+  for (i = 1; i <= 10; ++i)
+  {
+    term *= x / (f32)i;
+    sum += term;
+  }
+  return (sum);
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 powf(f32 base, f32 exponent)
+{
+  if (base == 0.0f)
+  {
+    return (0.0f);
+  }
+  if (exponent == 0.0f)
+  {
+    return (1.0f);
+  }
+  if (exponent == 1.0f)
+  {
+    return (base);
+  }
+
+  /* Approximate using: base^exp = exp(exp * ln(base)) */
+  return (exp_approxf(exponent * ln_approxf(base)));
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 absf(f32 x)
 {
   return (x < 0.0f ? -x : x);
@@ -1169,6 +1208,17 @@ SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_mulf(vec3 a, f32 value)
   result.x *= value;
   result.y *= value;
   result.z *= value;
+
+  return result;
+}
+
+SDF_CRAFT_API SDF_CRAFT_INLINE vec3 vec3_neg(vec3 a)
+{
+  vec3 result;
+
+  result.x = -a.x;
+  result.y = -a.y;
+  result.z = -a.z;
 
   return result;
 }
@@ -1404,9 +1454,18 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
       vec3 sky_color = vec3_init(0.5f, 0.8f, 0.9f);
       vec3 bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
 
+      vec3 halfv = vec3_normalize(vec3_add(sun_dir, vec3_neg(ray_direction)));
+
+      f32 specular = clampf(vec3_dot(nor, halfv), 0.0f, 1.0f);
+      specular = specular * specular;
+      specular = specular * specular;
+      specular = specular * specular; /* ^8 */
+      specular = specular * sun_dif * sun_sha;
+
       col = vec3_mulf(vec3_mul(material, sun_color), sun_dif * sun_sha);
       col = vec3_add(col, vec3_mulf(vec3_mul(material, sky_color), sky_dif * ao));
       col = vec3_add(col, vec3_mulf(vec3_mul(material, bounce_color), bou_dif * ao)); /* bounce light */
+      col = vec3_add(col, vec3_mulf(sun_color, specular * 0.05f));
     }
   }
 
