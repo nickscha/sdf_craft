@@ -1282,6 +1282,40 @@ SDF_CRAFT_API f32 sdf_ray_cast(win32_sdf_craft_state *state, vec3 ro, vec3 rd)
   return t;
 }
 
+SDF_CRAFT_API f32 sdf_soft_shadow(
+    win32_sdf_craft_state *state,
+    vec3 ro,
+    vec3 rd,
+    f32 tmin,
+    f32 tmax)
+{
+  f32 shadow_smoothness = 8.0f; /* 16.0f = sharper, 4.0f = softer */
+  f32 res = 1.0f;
+  f32 t = tmin;
+  u32 i;
+
+  for (i = 0; i < 32; ++i)
+  {
+    vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
+    f32 h = sdf_map(state, pos);
+
+    if (h < 0.001f)
+    {
+      return 0.0f; /* fully shadowed */
+    }
+
+    res = minf(res, shadow_smoothness * h / t);
+    t += clampf(h, 0.02f, 0.5f); /* orig: 0.01f, 0.2f */
+
+    if (t > tmax)
+    {
+      break;
+    }
+  }
+
+  return clampf(res, 0.0f, 1.0f);
+}
+
 SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
 {
   f32 t;
@@ -1332,7 +1366,8 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
       vec3 material = vec3_init(0.18f, 0.18f, 0.18f);
       vec3 sun_dir = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
       f32 sun_dif = clampf(vec3_dot(nor, sun_dir), 0.0f, 1.0f);
-      f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f);
+      /* f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f); */
+      f32 sun_sha = sdf_soft_shadow(state, vec3_add(pos, vec3_mulf(nor, 0.01f)), sun_dir, 0.02f, 5.0f);
       f32 sky_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_up), 0.0f, 1.0f);
       f32 bou_dif = clampf(0.5f + 0.5f * vec3_dot(nor, world_down), 0.0f, 1.0f);
 
