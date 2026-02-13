@@ -1316,6 +1316,34 @@ SDF_CRAFT_API f32 sdf_soft_shadow(
   return clampf(res, 0.0f, 1.0f);
 }
 
+SDF_CRAFT_API f32 sdf_fast_ao(
+    win32_sdf_craft_state *state,
+    vec3 pos,
+    vec3 nor)
+{
+  f32 occ = 0.0f;
+  f32 sca = 1.0f;
+  f32 h;
+  u32 i;
+
+  for (i = 0; i < 5; ++i)
+  {
+    vec3 p;
+    f32 d;
+
+    /* step distance grows each sample */
+    h = 0.01f + 0.12f * (f32)i / 4.0f;
+
+    p = vec3_add(pos, vec3_mulf(nor, h));
+    d = sdf_map(state, p);
+
+    occ += (h - d) * sca;
+    sca *= 0.95f; /* decay weight */
+  }
+
+  return clampf(1.0f - 3.0f * occ, 0.0f, 1.0f);
+}
+
 SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
 {
   f32 t;
@@ -1356,6 +1384,7 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
   {
     vec3 pos = vec3_add(ray_origin, vec3_mulf(ray_direction, t));
     vec3 nor = sdf_calc_normal(state, pos);
+    f32 ao = sdf_fast_ao(state, pos, nor);
 
     if (state->visualize_normals_enabled)
     {
@@ -1376,8 +1405,8 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
       vec3 bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
 
       col = vec3_mulf(vec3_mul(material, sun_color), sun_dif * sun_sha);
-      col = vec3_add(col, vec3_mulf(vec3_mul(material, sky_color), sky_dif));
-      col = vec3_add(col, vec3_mulf(vec3_mul(material, bounce_color), bou_dif)); /* bounce light */
+      col = vec3_add(col, vec3_mulf(vec3_mul(material, sky_color), sky_dif * ao));
+      col = vec3_add(col, vec3_mulf(vec3_mul(material, bounce_color), bou_dif * ao)); /* bounce light */
     }
   }
 
