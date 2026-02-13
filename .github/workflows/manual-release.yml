@@ -117,9 +117,9 @@ jobs:
           tag_name: ${{ github.event.inputs.version }}
           name: "${{ github.event.inputs.version }}: win32_sdf_craft.c release"
           body: |
-            # ${{ github.event.inputs.version }}: shade_it - OpenGL Shader Playground Release.
+            # ${{ github.event.inputs.version }}: sdf_craft - Raymarched CPU SDF Modeler Release
 
-            A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler entirely running on the CPU. (SDF_CRAFT).
+            A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler running entirely on the CPU. (SDF_CRAFT).
 
             ---
 
