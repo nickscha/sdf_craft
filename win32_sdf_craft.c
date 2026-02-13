@@ -1064,6 +1064,11 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 fmodf(f32 x, f32 y)
   return ((-quotient * y) + x);
 }
 
+SDF_CRAFT_API SDF_CRAFT_INLINE f32 repeatf(f32 x, f32 c)
+{
+  return x - c * floorf(x / c);
+}
+
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 absf(f32 x)
 {
   return (x < 0.0f ? -x : x);
@@ -1352,9 +1357,9 @@ SDF_CRAFT_API f32 sdf_map(sdf_state *state, vec3 pos)
   f32 spacing = 1.5f;
 
   vec3 p = vec3_init(
-      fmodf(pos.x + spacing * 0.5f, spacing) - spacing * 0.5f,
+      repeatf(pos.x + spacing * 0.5f, spacing) - spacing * 0.5f,
       pos.y,
-      fmodf(pos.z + spacing * 0.5f, spacing) - spacing * 0.5f);
+      repeatf(pos.z + spacing * 0.5f, spacing) - spacing * 0.5f);
 
   vec3 sphere_pos = state->scene.transform_position;
   vec3 sphere_rel = vec3_sub(p, sphere_pos);
@@ -1544,11 +1549,14 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
   u32 x, y;
 
   sdf_state state = {0};
+
+  /* Basic information */
   state.resolution = vec2_init((f32)s->framebuffer_width, (f32)s->framebuffer_height);
   state.time = (f32)s->iTime;
   state.world_up = vec3_init(0.0f, 1.0f, 0.0f);
   state.world_down = vec3_init(0.0f, -1.0f, 0.0f);
 
+  /* Camera Setup */
   state.camera_position = vec3_init(0.0f, 0.0f, 1.0f);
   state.camera_look_at = vec3_init(0.0f, 0.0f, 0.0f);
   state.camera_forward = vec3_normalize(vec3_sub(state.camera_look_at, state.camera_position)); /* Z-Axis */
@@ -1556,6 +1564,7 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
   state.camera_up = vec3_normalize(vec3_cross(state.camera_right, state.camera_forward));       /* Y-Axis */
   state.camera_fov = 1.5f;
 
+  /* Ligthning Setup */
   state.material_color = vec3_init(0.18f, 0.18f, 0.18f);
   state.sun_direction = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
   state.sun_color = vec3_init(7.0f, 4.5f, 3.0f);
@@ -1565,6 +1574,7 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
 
   state.visualize_normals_enabled = s->visualize_normals_enabled;
 
+  /* Scene Setup */
   state.scene.transform_position = vec3_init(0.0f, sinf(state.time) * 0.1f, 0.0f);
 
   for (y = 0; y < s->framebuffer_height; ++y)
