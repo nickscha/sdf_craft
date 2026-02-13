@@ -1356,7 +1356,7 @@ SDF_CRAFT_API f32 sdf_map(sdf_state *state, vec3 pos)
       pos.y,
       fmodf(pos.z + spacing * 0.5f, spacing) - spacing * 0.5f);
 
-  vec3 sphere_pos = vec3_init(0.0f, sinf(state->time) * 0.1f, 0.0f);
+  vec3 sphere_pos = state->scene.transform_position;
   vec3 sphere_rel = vec3_sub(p, sphere_pos);
 
   f32 sphere = sdf_sphere(sphere_rel, 0.25f);
@@ -1484,7 +1484,6 @@ SDF_CRAFT_API vec3 sdf_ray_march(sdf_state *state, vec2 frag_coord)
   {
     vec3 pos = vec3_add(state->camera_position, vec3_mulf(ray_direction, t));
     vec3 nor = sdf_calc_normal(state, pos);
-    f32 ao = sdf_fast_ao(state, pos, nor);
 
     if (state->visualize_normals_enabled)
     {
@@ -1492,6 +1491,8 @@ SDF_CRAFT_API vec3 sdf_ray_march(sdf_state *state, vec2 frag_coord)
     }
     else
     {
+      f32 ao = sdf_fast_ao(state, pos, nor);
+
       f32 sun_dif = clampf(vec3_dot(nor, state->sun_direction), 0.0f, 1.0f);
       /* f32 sun_sha = stepf(sdf_ray_cast(state, vec3_add(pos, vec3_mulf(nor, 0.001f)), sun_dir), 0.0f); */
       f32 sun_sha = sdf_soft_shadow(state, vec3_add(pos, vec3_mulf(nor, 0.01f)), state->sun_direction, 0.02f, 5.0f);
@@ -1509,7 +1510,7 @@ SDF_CRAFT_API vec3 sdf_ray_march(sdf_state *state, vec2 frag_coord)
       col = vec3_mulf(vec3_mul(state->material_color, state->sun_color), sun_dif * sun_sha);
       col = vec3_add(col, vec3_mulf(vec3_mul(state->material_color, state->sky_color), sky_dif * ao));
       col = vec3_add(col, vec3_mulf(vec3_mul(state->material_color, state->bounce_color), bou_dif * ao)); /* bounce light */
-      col = vec3_add(col, vec3_mulf(state->sun_color, specular * 0.05f));
+      col = vec3_add(col, vec3_mulf(state->sun_color, specular * state->specular_intensity));
     }
   }
 
@@ -1563,6 +1564,8 @@ SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
   state.specular_intensity = 0.05f;
 
   state.visualize_normals_enabled = s->visualize_normals_enabled;
+
+  state.scene.transform_position = vec3_init(0.0f, sinf(state.time) * 0.1f, 0.0f);
 
   for (y = 0; y < s->framebuffer_height; ++y)
   {
