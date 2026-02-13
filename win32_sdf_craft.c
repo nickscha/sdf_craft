@@ -1541,46 +1541,17 @@ SDF_CRAFT_API SDF_CRAFT_INLINE u8 f32_to_u8(f32 v)
  *   mainImage(FragColor, fragCoord);
  * }
  */
-SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s)
+SDF_CRAFT_API void sdf_craft_main(win32_sdf_craft_state *s, sdf_state *sdf_state)
 {
   u32 *pixel = (u32 *)s->framebuffer;
   u32 x, y;
-
-  sdf_state state = {0};
-
-  /* Basic information */
-  state.resolution = vec2_init((f32)s->framebuffer_width, (f32)s->framebuffer_height);
-  state.time = (f32)s->iTime;
-  state.world_up = vec3_init(0.0f, 1.0f, 0.0f);
-  state.world_down = vec3_init(0.0f, -1.0f, 0.0f);
-
-  /* Camera Setup */
-  state.camera_position = vec3_init(0.0f, 0.0f, 1.0f);
-  state.camera_look_at = vec3_init(0.0f, 0.0f, 0.0f);
-  state.camera_forward = vec3_normalize(vec3_sub(state.camera_look_at, state.camera_position)); /* Z-Axis */
-  state.camera_right = vec3_normalize(vec3_cross(state.camera_forward, state.world_up));        /* X-Axis */
-  state.camera_up = vec3_normalize(vec3_cross(state.camera_right, state.camera_forward));       /* Y-Axis */
-  state.camera_fov = 1.5f;
-
-  /* Ligthning Setup */
-  state.material_color = vec3_init(0.18f, 0.18f, 0.18f);
-  state.sun_direction = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
-  state.sun_color = vec3_init(7.0f, 4.5f, 3.0f);
-  state.sky_color = vec3_init(0.5f, 0.8f, 0.9f);
-  state.bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
-  state.specular_intensity = 0.05f;
-
-  state.visualize_normals_enabled = s->visualize_normals_enabled;
-
-  /* Scene Setup */
-  state.scene.transform_position = vec3_init(0.0f, sinf(state.time) * 0.1f, 0.0f);
 
   for (y = 0; y < s->framebuffer_height; ++y)
   {
     for (x = 0; x < s->framebuffer_width; ++x)
     {
       vec2 frag_coord = vec2_init((f32)x + 0.5f, (f32)y + 0.5f);
-      vec3 color = sdf_ray_march(&state, frag_coord);
+      vec3 color = sdf_ray_march(sdf_state, frag_coord);
 
       *pixel++ = (f32_to_u8(color.x) << 16) | (f32_to_u8(color.y) << 8) | f32_to_u8(color.z);
     }
@@ -1646,6 +1617,31 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
     i64 time_start;
     i64 time_start_fps_cap;
     i64 time_last;
+
+    /******************************/
+    /* SDF State Setup            */
+    /******************************/
+    sdf_state sdf_state = {0};
+
+    /* Basic information */
+    sdf_state.world_up = vec3_init(0.0f, 1.0f, 0.0f);
+    sdf_state.world_down = vec3_init(0.0f, -1.0f, 0.0f);
+
+    /* Camera Setup */
+    sdf_state.camera_position = vec3_init(0.0f, 0.0f, 1.0f);
+    sdf_state.camera_look_at = vec3_init(0.0f, 0.0f, 0.0f);
+    sdf_state.camera_forward = vec3_normalize(vec3_sub(sdf_state.camera_look_at, sdf_state.camera_position)); /* Z-Axis */
+    sdf_state.camera_right = vec3_normalize(vec3_cross(sdf_state.camera_forward, sdf_state.world_up));        /* X-Axis */
+    sdf_state.camera_up = vec3_normalize(vec3_cross(sdf_state.camera_right, sdf_state.camera_forward));       /* Y-Axis */
+    sdf_state.camera_fov = 1.5f;
+
+    /* Ligthning Setup */
+    sdf_state.material_color = vec3_init(0.18f, 0.18f, 0.18f);
+    sdf_state.sun_direction = vec3_normalize(vec3_init(0.8f, 0.4f, 0.2f));
+    sdf_state.sun_color = vec3_init(7.0f, 4.5f, 3.0f);
+    sdf_state.sky_color = vec3_init(0.5f, 0.8f, 0.9f);
+    sdf_state.bounce_color = vec3_init(0.7f, 0.3f, 0.2f);
+    sdf_state.specular_intensity = 0.05f;
 
     QueryPerformanceFrequency(&perf_freq);
     QueryPerformanceCounter(&time_start);
@@ -1747,7 +1743,12 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
         state.visualize_normals_enabled = !state.visualize_normals_enabled;
       }
 
-      sdf_craft_main(&state);
+      sdf_state.resolution = vec2_init((f32)state.framebuffer_width, (f32)state.framebuffer_height);
+      sdf_state.visualize_normals_enabled = state.visualize_normals_enabled;
+      sdf_state.time = (f32)state.iTime;
+      sdf_state.scene.transform_position = vec3_init(0.0f, sinf(sdf_state.time) * 0.1f, 0.0f);
+
+      sdf_craft_main(&state, &sdf_state);
 
       StretchDIBits(
           state.device_context,
