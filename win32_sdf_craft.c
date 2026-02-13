@@ -1048,22 +1048,6 @@ SDF_CRAFT_API SDF_CRAFT_INLINE f32 floorf(f32 x)
   return (x < 0.0f && x != (f32)i) ? (f32)(i - 1) : (f32)i;
 }
 
-SDF_CRAFT_API SDF_CRAFT_INLINE f32 fmodf(f32 x, f32 y)
-{
-  f32 quotient;
-
-  /* Handle special cases where y is 0 */
-  if (y == 0.0f)
-  {
-    return (0.0f);
-  }
-
-  /* Compute the quotient (truncated towards zero) */
-  quotient = floorf(x / y);
-
-  return ((-quotient * y) + x);
-}
-
 SDF_CRAFT_API SDF_CRAFT_INLINE f32 repeatf(f32 x, f32 c)
 {
   return x - c * floorf(x / c);
