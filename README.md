@@ -1,5 +1,5 @@
 # sdf_craft
-A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler entirely running on the CPU.
+A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler running entirely on the CPU.
 
 <p align="center">
 <a href="https://github.com/nickscha/sdf_craft"><img src="assets/sdf_sphere.png"></a>
@@ -64,6 +64,16 @@ You can now run the `win32_sdf_craft.exe` program.
 ```bat
 win32_sdf_craft_x64.exe
 ```
+
+## Roadmap
+
+For the next release of **CRAFT_IT** the following features are planend.
+
+### v0.1 Features
+- [x] Win32 ARM, x64 release build
+- [x] Basic Raymarched SDF with Normals, Shadow Mapping, Ambient Occlusion, Specular Highlights
+
+The **v0.1** release is an early version and only suitable for learning purpose to see how a basic raymarcher can be implemented on the CPU.
 
 ## "nostdlib" Motivation & Purpose
 
