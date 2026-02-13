@@ -1277,28 +1277,32 @@ SDF_CRAFT_API vec3 sdf_ray_march(win32_sdf_craft_state *state, vec2 frag_coord)
 
   vec2 p = vec2_divf(vec2_sub(vec2_mulf(frag_coord, 2.0f), iResolution), iResolution.y);
 
-  /*
-    f32 angle = 0.1f * (f32)state->iTime;
-    vec3 ro = vec3_init(1.0f * sinf(angle), 0.0f, 1.0f * cosf(angle));
-  */
+  vec3 ray_origin = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin (camera position) */
+  vec3 look_at_target = vec3_init(0.0f, 0.0f, 0.0f);
 
-  vec3 ro = vec3_init(0.0f, 0.0f, 1.0f); /* ray origin */
-  vec3 ta = vec3_init(0.0f, 0.0f, 0.0f);
+  /* Camera Setup:
+   *
+   *     vv  = camera up
+   *     |
+   *     |
+   *     o---- uu = camera right
+   *    /
+   *  ww = camera forward (view direction)
+   */
+  vec3 forward = vec3_normalize(vec3_sub(look_at_target, ray_origin));           /* Z-Axis */
+  vec3 right = vec3_normalize(vec3_cross(forward, vec3_init(0.0f, 1.0f, 0.0f))); /* X-Axis */
+  vec3 up = vec3_normalize(vec3_cross(right, forward));                          /* Y-Axis */
 
-  vec3 ww = vec3_normalize(vec3_sub(ta, ro));
-  vec3 uu = vec3_normalize(vec3_cross(ww, vec3_init(0.0f, 1.0f, 0.0f)));
-  vec3 vv = vec3_normalize(vec3_cross(uu, ww));
+  vec3 ray_direction = vec3_normalize(vec3_add(vec3_add(vec3_mulf(right, p.x), vec3_mulf(up, p.y)), vec3_mulf(forward, 1.5f))); /* ray direction */
 
-  vec3 rd = vec3_normalize(vec3_add(vec3_add(vec3_mulf(uu, p.x), vec3_mulf(vv, p.y)), vec3_mulf(ww, 1.5f))); /* ray direction */
+  vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * ray_direction.y);        /* sky, darker the higher */
+  col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), expf(-10.0f * ray_direction.y)); /* above ground light horizon */
 
-  vec3 col = vec3_subf(vec3_init(0.4f, 0.75f, 1.0f), 0.7f * rd.y);        /* sky, darker the higher */
-  col = vec3_mix(col, vec3_init(0.7f, 0.75f, 0.8f), expf(-10.0f * rd.y)); /* above ground light horizon */
-
-  t = sdf_ray_cast(state, ro, rd);
+  t = sdf_ray_cast(state, ray_origin, ray_direction);
 
   if (t > 0.0f)
   {
-    vec3 pos = vec3_add(ro, vec3_mulf(rd, t));
+    vec3 pos = vec3_add(ray_origin, vec3_mulf(ray_direction, t));
     vec3 nor = sdf_calc_normal(state, pos);
 
     if (state->visualize_normals_enabled)
