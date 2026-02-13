@@ -30,7 +30,7 @@ A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modele
 </p>
 
 ## Features
-- **Minimal binary size** — around **28kb** binary
+- **Minimal binary size** — around **16kb** binary
 - **Zero dependencies** — own win32 layer implementation, own OpenGL context creation
 - **C89 compliant** — portable and legacy-friendly  
 - **nostdlib** — no dependency on the C Standard Library

@@ -1,4 +1,4 @@
-/* win32_sdf_craft.c - v0.1 - public domain data structures - nickscha 2026
+/* win32_sdf_craft.c - v0.2 - public domain data structures - nickscha 2026
 
 A C89 standard compliant, nostdlib (no C Standard Library) Raymarched SDF Modeler entirely running on the CPU. (SDF_CRAFT).
 
@@ -1573,7 +1573,7 @@ SDF_CRAFT_API i32 start(i32 argc, u8 **argv)
 {
   win32_sdf_craft_state state = {0};
   state.running = 1;
-  state.window_title = "sdf_craft v0.1 (F1=Normals)";
+  state.window_title = "sdf_craft v0.2 (F1=Normals)";
   state.framebuffer_width = 300;
   state.framebuffer_height = 225;
   state.window_width = state.framebuffer_width * 2;
