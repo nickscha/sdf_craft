@@ -69,6 +69,9 @@ win32_sdf_craft_x64.exe
 
 For the next release of **SDF_CRAFT** the following features are planend.
 
+### v0.2 Features
+- [ ] Sparse cached SDF brick atlas rendering with trilinear interpolation
+
 ### v0.1 Features
 - [x] Win32 ARM, x64 release build
 - [x] Basic Raymarched SDF with Normals, Shadow Mapping, Ambient Occlusion, Specular Highlights
